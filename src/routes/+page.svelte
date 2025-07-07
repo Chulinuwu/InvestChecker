@@ -2,6 +2,12 @@
   import { onMount } from 'svelte'
   import { investmentService } from '$lib/supabase'
   
+  // Login state
+  let isAuthenticated = false
+  let loginUsername = ''
+  let loginPassword = ''
+  let loginError = ''
+  
   let investments: any[] = []
   let loading = true
   let error: string | null = null
@@ -30,8 +36,42 @@
   }
 
   onMount(async () => {
-    await loadInvestments()
+    // Check if already logged in (from localStorage)
+    const savedAuth = localStorage.getItem('isAuthenticated')
+    if (savedAuth === 'true') {
+      isAuthenticated = true
+      await loadInvestments()
+    } else {
+      loading = false
+    }
   })
+
+  function handleLogin() {
+    const validUsername = import.meta.env.VITE_LOGIN_USERNAME
+    const validPassword = import.meta.env.VITE_LOGIN_PASSWORD
+    
+    if (loginUsername === validUsername && loginPassword === validPassword) {
+      isAuthenticated = true
+      localStorage.setItem('isAuthenticated', 'true')
+      loginError = ''
+      loadInvestments()
+    } else {
+      loginError = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+    }
+  }
+
+  function handleLogout() {
+    isAuthenticated = false
+    localStorage.removeItem('isAuthenticated')
+    loginUsername = ''
+    loginPassword = ''
+    loginError = ''
+    investments = []
+    showAddForm = false
+    showEditModal = false
+    showCharts = false
+    showReceivedModal = false
+  }
 
   async function loadInvestments() {
     try {
@@ -397,10 +437,80 @@
 </script>
 
 <div class="min-h-screen bg-gray-50 font-sans text-gray-800">
-  <header class="bg-gradient-to-r from-pink-300 to-pink-500 text-white py-8 text-center shadow-xl">
-    <div class="max-w-6xl mx-auto px-4">
-      <h1 class="text-4xl font-bold mb-2">Twenty Toys</h1>
-      <p class="opacity-90 text-lg">Track your investment </p>
+  {#if !isAuthenticated}
+    <!-- Login Screen -->
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-100 to-pink-200">
+      <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+          <div class="text-center mb-8">
+            <div class="text-6xl mb-4">🔐</div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Twenty Toys</h1>
+            <p class="text-gray-600">Investment Tracking System</p>
+          </div>
+          
+          <form on:submit|preventDefault={handleLogin} class="space-y-6">
+            <div class="space-y-2">
+              <label for="username" class="block text-sm font-medium text-gray-700">ชื่อผู้ใช้</label>
+              <input 
+                type="text" 
+                id="username" 
+                bind:value={loginUsername}
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors"
+                placeholder="กรอกชื่อผู้ใช้"
+              />
+            </div>
+            
+            <div class="space-y-2">
+              <label for="password" class="block text-sm font-medium text-gray-700">รหัสผ่าน</label>
+              <input 
+                type="password" 
+                id="password" 
+                bind:value={loginPassword}
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors"
+                placeholder="กรอกรหัสผ่าน"
+              />
+            </div>
+            
+            {#if loginError}
+              <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{loginError}</span>
+              </div>
+            {/if}
+            
+            <button 
+              type="submit" 
+              class="w-full bg-pink-500 hover:bg-pink-600 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              <span>🚀</span>
+              เข้าสู่ระบบ
+            </button>
+          </form>
+          
+          <div class="mt-8 text-center text-sm text-gray-500">
+            <p>ระบบติดตามการลงทุน</p>
+            <p class="mt-1">© Twenty Toys Investment Tracker</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  {:else}
+    <!-- Main Application (ถ้าผ่าน login แล้ว) -->
+  <header class="bg-gradient-to-r from-pink-300 to-pink-500 text-white py-8 shadow-xl">
+    <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
+      <div class="text-center flex-1">
+        <h1 class="text-4xl font-bold mb-2">Twenty Toys</h1>
+        <p class="opacity-90 text-lg">Track your investment</p>
+      </div>
+      <button 
+        on:click={handleLogout}
+        class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
+      >
+        <span>🚪</span>
+        ออกจากระบบ
+      </button>
     </div>
   </header>
 
@@ -1218,13 +1328,15 @@
         </section>
       {/if}
     </div>
-    
   </main>
-    <header class="bg-gradient-to-r from-pink-300 to-pink-500 text-white py-16 text-center shadow-xl">
+
+  <!-- Footer -->
+  <footer class="bg-gradient-to-r from-pink-300 to-pink-500 text-white py-8 text-center">
     <div class="max-w-6xl mx-auto px-4">
-      <h1 class="text-2xl font-bold mb-2">This Website was made by Chulinxz, feel free to contact me anytime :D</h1>
-      <p class="opacity-90 text-lg">© Chulinx Folio, All Right Reserved | Implemented by Svelte+Supabase</p>
+      <h2 class="text-lg font-semibold mb-2">This Website was made by Chulinxz, feel free to contact me anytime :D</h2>
+      <p class="opacity-90">© Chulinx Folio, All Right Reserved | Implemented by Svelte+Supabase</p>
     </div>
-  </header>
+  </footer>
+  {/if}
 </div>
 
