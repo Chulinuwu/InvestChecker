@@ -20,6 +20,10 @@
   let modalInvestment: any = null
   let receivedAmount = ''
   
+  // Filter state
+  let filterStatus = 'all'
+  let searchQuery = ''
+  
   // Form data
   let formData = {
     amount: '',
@@ -360,6 +364,28 @@
   $: completedInvestments = investments.filter(inv => inv.status === 'completed')
   $: overallROI = totalInvested > 0 ? ((totalReceived - totalInvested) / totalInvested) * 100 : 0
   
+  // Filtered investments
+  $: filteredInvestments = investments.filter(investment => {
+    // Filter by status
+    if (filterStatus !== 'all' && investment.status !== filterStatus) {
+      return false
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      return (
+        (investment.product_type || '').toLowerCase().includes(query) ||
+        (investment.supplier || '').toLowerCase().includes(query) ||
+        (investment.customer || '').toLowerCase().includes(query) ||
+        (investment.notes || '').toLowerCase().includes(query) ||
+        investment.id.toString().includes(query)
+      )
+    }
+    
+    return true
+  })
+  
   // ข้อมูลสำหรับกราฟ
   $: chartData = {
     monthly: getMonthlyData(),
@@ -610,6 +636,38 @@
             <span>🧪</span>
             เพิ่มข้อมูลตัวอย่าง
           </button>
+          
+          <!-- Quick Filter Buttons -->
+          <div class="flex flex-wrap gap-2 ml-auto">
+            <button 
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'all' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              on:click={() => filterStatus = 'all'}
+            >
+              <span>📋</span>
+              ทั้งหมด
+            </button>
+            <button 
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'active' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              on:click={() => filterStatus = 'active'}
+            >
+              <span>🔄</span>
+              กำลังดำเนินการ
+            </button>
+            <button 
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              on:click={() => filterStatus = 'completed'}
+            >
+              <span>✅</span>
+              เสร็จสิ้น
+            </button>
+            <button 
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'cancelled' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              on:click={() => filterStatus = 'cancelled'}
+            >
+              <span>❌</span>
+              ยกเลิก
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1121,14 +1179,77 @@
         </section>
       {:else}
         <section class="space-y-6">
+          <!-- Filter Section -->
+          <div class="bg-white rounded-lg shadow-lg border border-pink-200 p-6">
+            <div class="flex flex-col sm:flex-row gap-4 items-center">
+              <div class="flex items-center gap-2 text-lg font-medium text-gray-700">
+                <span>🔍</span>
+                <span>กรองและค้นหา</span>
+              </div>
+              
+              <div class="flex flex-col sm:flex-row gap-4 flex-1">
+                <!-- Status Filter -->
+                <div class="flex items-center gap-2">
+                  <label for="status-filter" class="text-sm font-medium text-gray-600">สถานะ:</label>
+                  <select 
+                    id="status-filter" 
+                    bind:value={filterStatus}
+                    class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                  >
+                    <option value="all">ทั้งหมด</option>
+                    <option value="active">กำลังดำเนินการ</option>
+                    <option value="completed">เสร็จสิ้น</option>
+                    <option value="cancelled">ยกเลิก</option>
+                  </select>
+                </div>
+                
+                <!-- Search Input -->
+                <div class="flex items-center gap-2 flex-1">
+                  <label for="search-input" class="text-sm font-medium text-gray-600">ค้นหา:</label>
+                  <input 
+                    id="search-input"
+                    type="text" 
+                    bind:value={searchQuery}
+                    placeholder="ค้นหาจาก ID, ประเภทสินค้า, ซัพพลายเออร์, ลูกค้า, หมายเหตุ..."
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                  />
+                  {#if searchQuery}
+                    <button 
+                      on:click={() => searchQuery = ''}
+                      class="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors"
+                      title="ล้างการค้นหา"
+                    >
+                      <span class="text-lg">✕</span>
+                    </button>
+                  {/if}
+                </div>
+              </div>
+            </div>
+            
+            <!-- Filter Results Info -->
+            <div class="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
+              <span>แสดงผล: <strong class="text-pink-600">{filteredInvestments.length}</strong> จาก <strong>{investments.length}</strong> รายการ</span>
+              {#if filterStatus !== 'all'}
+                <span class="bg-pink-100 text-pink-800 px-2 py-1 rounded-full">
+                  สถานะ: {filterStatus === 'active' ? 'กำลังดำเนินการ' : filterStatus === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิก'}
+                </span>
+              {/if}
+              {#if searchQuery.trim()}
+                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                  ค้นหา: "{searchQuery}"
+                </span>
+              {/if}
+            </div>
+          </div>
+          
           <div class="flex items-center justify-between">
             <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
               <span class="text-2xl">📋</span>
-              การลงทุนทั้งหมด ({investments.length})
+              การลงทุนทั้งหมด ({filteredInvestments.length})
             </h2>
           </div>
           
-          {#each investments as investment (investment.id)}
+          {#each filteredInvestments as investment (investment.id)}
             <div class="bg-white rounded-lg shadow-lg border border-pink-200 p-6 {investment.status === 'active' ? 'border-l-4 border-l-green-500' : investment.status === 'completed' ? 'border-l-4 border-l-blue-500' : 'border-l-4 border-l-gray-400'}">
               <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4">
                 <div class="mb-2 lg:mb-0">
@@ -1311,18 +1432,38 @@
             </div>
           {/each}
           
-          {#if investments.length === 0}
+          {#if filteredInvestments.length === 0}
             <div class="flex flex-col items-center justify-center py-16 bg-white rounded-lg shadow-lg border border-pink-200">
-              <div class="text-6xl mb-4">💼</div>
-              <h3 class="text-2xl font-bold text-gray-800 mb-2">ยังไม่มีการลงทุน</h3>
-              <p class="text-gray-600 mb-6">เริ่มต้นติดตามการลงทุนของคุณวันนี้</p>
-              <button class="bg-pink-500 hover:bg-pink-600 text-white font-medium py-3 px-6 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => {
-                showAddForm = true
-                resetForm()
-              }}>
-                <span class="text-lg">➕</span>
-                เพิ่มการลงทุนแรก
-              </button>
+              {#if investments.length === 0}
+                <div class="text-6xl mb-4">💼</div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">ยังไม่มีการลงทุน</h3>
+                <p class="text-gray-600 mb-6">เริ่มต้นติดตามการลงทุนของคุณวันนี้</p>
+                <button class="bg-pink-500 hover:bg-pink-600 text-white font-medium py-3 px-6 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => {
+                  showAddForm = true
+                  resetForm()
+                }}>
+                  <span class="text-lg">➕</span>
+                  เพิ่มการลงทุนแรก
+                </button>
+              {:else}
+                <div class="text-6xl mb-4">🔍</div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">ไม่พบข้อมูลที่ค้นหา</h3>
+                <p class="text-gray-600 mb-6">ลองเปลี่ยนคำค้นหาหรือสถานะที่กรอง</p>
+                <div class="flex gap-2">
+                  <button 
+                    class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
+                    on:click={() => searchQuery = ''}
+                  >
+                    ล้างการค้นหา
+                  </button>
+                  <button 
+                    class="bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
+                    on:click={() => { filterStatus = 'all'; searchQuery = '' }}
+                  >
+                    รีเซ็ตตัวกรอง
+                  </button>
+                </div>
+              {/if}
             </div>
           {/if}
         </section>
