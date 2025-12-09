@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { investmentService } from '$lib/supabase'
+  import { investmentService, investmentLogService } from '$lib/supabase'
   
   // Login state
   let isAuthenticated = false
@@ -19,6 +19,13 @@
   let showReceivedModal = false
   let modalInvestment: any = null
   let receivedAmount = ''
+  
+  // Transaction History state
+  let showTransactionHistory = false
+  let transactionLogs: any[] = []
+  let transactionLoading = false
+  let selectedInvestmentForLogs: number | null = null
+  let transactionViewMode: 'card' | 'table' = 'card' // 'card' หรือ 'table'
   
   // Filter state
   let filterStatus = 'all'
@@ -113,6 +120,13 @@
       
       const result = await investmentService.addInvestment(newInvestment)
       investments = [result, ...investments]
+      
+      // บันทึก log การสร้าง investment ใหม่ (เงินออก)
+      await investmentLogService.logInitialInvestment(
+        result.id,
+        parseFloat(formData.amount),
+        `สร้างการลงทุนใหม่: ${formData.product_type || 'ไม่ระบุประเภท'}`
+      )
       
       resetForm()
       showAddForm = false
@@ -221,10 +235,22 @@
     }
 
     try {
-      const totalReceived = (modalInvestment.current_received || 0) + parseFloat(receivedAmount)
+      const balanceBefore = modalInvestment.current_received || 0
+      const amountToAdd = parseFloat(receivedAmount)
+      const totalReceived = balanceBefore + amountToAdd
+      
       await investmentService.updateInvestment(modalInvestment.id, { 
         current_received: totalReceived 
       })
+      
+      // บันทึก log เงินเข้า (deposit)
+      await investmentLogService.logDeposit(
+        modalInvestment.id,
+        amountToAdd,
+        balanceBefore,
+        `รับเงินคืน: ${modalInvestment.product_type || 'การลงทุน #' + modalInvestment.id}`
+      )
+      
       await loadInvestments()
       closeReceivedModal()
       error = null
@@ -460,6 +486,61 @@
     console.log('Product type data:', result) // Debug log
     return result
   }
+
+  // Transaction History Functions
+  async function loadTransactionLogs(investmentId: number | null = null) {
+    try {
+      transactionLoading = true
+      selectedInvestmentForLogs = investmentId
+      transactionLogs = await investmentLogService.getLogs(investmentId)
+      transactionLoading = false
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'An error occurred loading transaction logs'
+      transactionLoading = false
+    }
+  }
+
+  async function openTransactionHistory(investmentId: number | null = null) {
+    showTransactionHistory = true
+    await loadTransactionLogs(investmentId)
+  }
+
+  function closeTransactionHistory() {
+    showTransactionHistory = false
+    transactionLogs = []
+    selectedInvestmentForLogs = null
+  }
+
+  function formatTransactionType(type: string) {
+    switch (type) {
+      case 'initial_investment':
+        return { label: 'สร้างการลงทุน', color: 'text-orange-600', bg: 'bg-orange-100', icon: '💸' }
+      case 'deposit':
+        return { label: 'เงินเข้า', color: 'text-green-600', bg: 'bg-green-100', icon: '💰' }
+      case 'withdrawal':
+        return { label: 'เงินออก', color: 'text-red-600', bg: 'bg-red-100', icon: '💳' }
+      default:
+        return { label: type, color: 'text-gray-600', bg: 'bg-gray-100', icon: '📝' }
+    }
+  }
+
+  function formatDate(dateString: string) {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  function formatCurrency(amount: number) {
+    return new Intl.NumberFormat('th-TH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount)
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -524,17 +605,16 @@
     </div>
   {:else}
     <!-- Main Application (ถ้าผ่าน login แล้ว) -->
-  <header class="bg-gradient-to-r from-pink-300 to-pink-500 text-white py-8 shadow-xl">
+  <header class="bg-pink-400 text-white py-8">
     <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
-      <div class="text-center flex-1">
+      <div class=" flex-1">
         <h1 class="text-4xl font-bold mb-2">Twenty Toys</h1>
         <p class="opacity-90 text-lg">Track your investment</p>
       </div>
       <button 
         on:click={handleLogout}
-        class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
+        class="bg-white text-pink-300 hover:text-pink-500 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
       >
-        <span>🚪</span>
         ออกจากระบบ
       </button>
     </div>
@@ -544,7 +624,7 @@
     <div class="max-w-6xl mx-auto px-4">
       <!-- Summary Cards -->
       <section class="mb-12">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center gap-2">📊 Overview</h2>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center gap-2">Overview</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
             <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">💰</div>
@@ -632,9 +712,10 @@
             {showCharts ? 'ซ่อนกราฟ' : 'แสดงกราฟ'}
           </button>
           
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={addSampleData}>
-            <span>🧪</span>
-            เพิ่มข้อมูลตัวอย่าง
+          
+          <button class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-600 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => openTransactionHistory(null)}>
+            <span>📜</span>
+            ประวัติธุรกรรม
           </button>
           
           <!-- Quick Filter Buttons -->
@@ -1479,5 +1560,537 @@
     </div>
   </footer>
   {/if}
+
+<!-- Transaction History Modal -->
+{#if showTransactionHistory}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" on:click={closeTransactionHistory}>
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" on:click|stopPropagation>
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+              <span>📜</span>
+              ประวัติธุรกรรม
+            </h2>
+            <p class="text-indigo-100 mt-1">
+              {#if selectedInvestmentForLogs}
+                การลงทุน #{selectedInvestmentForLogs}
+              {:else}
+                ธุรกรรมทั้งหมด ({transactionLogs.length} รายการ)
+              {/if}
+            </p>
+          </div>
+          <button 
+            class="text-white hover:text-indigo-200 transition-colors p-2"
+            on:click={closeTransactionHistory}
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+        {#if transactionLoading}
+          <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+          </div>
+        {:else if transactionLogs.length === 0}
+          <div class="text-center py-12">
+            <div class="text-6xl mb-4">📭</div>
+            <h3 class="text-xl font-bold text-gray-700 mb-2">ยังไม่มีประวัติธุรกรรม</h3>
+            <p class="text-gray-500">เริ่มสร้างการลงทุนใหม่เพื่อดูประวัติที่นี่</p>
+          </div>
+        {:else}
+          <!-- View Mode Toggle -->
+          <div class="flex justify-end mb-4">
+            <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+              <button 
+                class="px-4 py-2 text-sm font-medium rounded-md transition-colors {transactionViewMode === 'card' ? 'bg-indigo-500 text-white' : 'text-gray-600 hover:text-gray-800'}"
+                on:click={() => transactionViewMode = 'card'}
+              >
+                <span class="mr-1">🃏</span> Card
+              </button>
+              <button 
+                class="px-4 py-2 text-sm font-medium rounded-md transition-colors {transactionViewMode === 'table' ? 'bg-indigo-500 text-white' : 'text-gray-600 hover:text-gray-800'}"
+                on:click={() => transactionViewMode = 'table'}
+              >
+                <span class="mr-1">📋</span> Table
+              </button>
+            </div>
+          </div>
+
+          <!-- Card View -->
+          {#if transactionViewMode === 'card'}
+            <div class="space-y-4">
+              {#each transactionLogs as log}
+                {@const typeInfo = formatTransactionType(log.type)}
+                <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                  <div class="flex items-start justify-between gap-4">
+                    <!-- Left: Icon & Type -->
+                    <div class="flex items-center gap-3">
+                      <div class="w-12 h-12 rounded-full {typeInfo.bg} flex items-center justify-center text-2xl">
+                        {typeInfo.icon}
+                      </div>
+                      <div>
+                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium {typeInfo.bg} {typeInfo.color}">
+                          {typeInfo.label}
+                        </span>
+                        <p class="text-gray-500 text-sm mt-1">
+                          {formatDate(log.transaction_date)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <!-- Right: Amount -->
+                    <div class="text-right">
+                      <p class="text-xl font-bold {log.amount >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        {log.amount >= 0 ? '+' : ''}{formatCurrency(log.amount)} บาท
+                      </p>
+                      {#if log.type !== 'initial_investment'}
+                        <p class="text-sm text-gray-500">
+                          ยอดรวม: {formatCurrency(log.balance_after)} บาท
+                        </p>
+                      {/if}
+                    </div>
+                  </div>
+                  
+                  <!-- Details -->
+                  <div class="mt-3 pt-3 border-t border-gray-200">
+                    <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                      {#if log.investments}
+                        <div class="flex items-center gap-1">
+                          <span class="text-gray-500">🏷️ การลงทุน:</span>
+                          <span class="font-medium">
+                            {log.investments.product_type || `#${log.investment_id}`}
+                          </span>
+                        </div>
+                        {#if log.investments.supplier}
+                          <div class="flex items-center gap-1">
+                            <span class="text-gray-500">🏭 Supplier:</span>
+                            <span class="font-medium">{log.investments.supplier}</span>
+                          </div>
+                        {/if}
+                        {#if log.investments.customer}
+                          <div class="flex items-center gap-1">
+                            <span class="text-gray-500">🛒 Customer:</span>
+                            <span class="font-medium">{log.investments.customer}</span>
+                          </div>
+                        {/if}
+                      {/if}
+                    </div>
+                    {#if log.notes}
+                      <p class="mt-2 text-gray-600 text-sm">
+                        💬 {log.notes}
+                      </p>
+                    {/if}
+                    {#if log.type !== 'initial_investment'}
+                      <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                        <span>ก่อน: {formatCurrency(log.balance_before)} บาท</span>
+                        <span>→</span>
+                        <span>หลัง: {formatCurrency(log.balance_after)} บาท</span>
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <!-- Table View -->
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[800px]">
+                <thead class="bg-gray-100 sticky top-0">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">วันที่</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ประเภท</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">การลงทุน</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">จำนวนเงิน</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">ยอดก่อน</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">ยอดหลัง</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">หมายเหตุ</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  {#each transactionLogs as log, index}
+                    {@const typeInfo = formatTransactionType(log.type)}
+                    <tr class="hover:bg-gray-50 transition-colors {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
+                      <!-- วันที่ -->
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">{formatDate(log.transaction_date)}</div>
+                      </td>
+                      
+                      <!-- ประเภท -->
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium {typeInfo.bg} {typeInfo.color}">
+                          <span>{typeInfo.icon}</span>
+                          {typeInfo.label}
+                        </span>
+                      </td>
+                      
+                      <!-- การลงทุน -->
+                      <td class="px-4 py-3">
+                        <div class="text-sm font-medium text-gray-900">
+                          {log.investments?.product_type || `#${log.investment_id}`}
+                        </div>
+                        {#if log.investments?.supplier || log.investments?.customer}
+                          <div class="text-xs text-gray-500">
+                            {#if log.investments?.supplier}
+                              <span>🏭 {log.investments.supplier}</span>
+                            {/if}
+                            {#if log.investments?.supplier && log.investments?.customer}
+                              <span class="mx-1">•</span>
+                            {/if}
+                            {#if log.investments?.customer}
+                              <span>🛒 {log.investments.customer}</span>
+                            {/if}
+                          </div>
+                        {/if}
+                      </td>
+                      
+                      <!-- จำนวนเงิน -->
+                      <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <span class="text-sm font-bold {log.amount >= 0 ? 'text-green-600' : 'text-red-600'}">
+                          {log.amount >= 0 ? '+' : ''}{formatCurrency(log.amount)}
+                        </span>
+                      </td>
+                      
+                      <!-- ยอดก่อน -->
+                      <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <span class="text-sm text-gray-600">
+                          {log.type === 'initial_investment' ? '-' : formatCurrency(log.balance_before)}
+                        </span>
+                      </td>
+                      
+                      <!-- ยอดหลัง -->
+                      <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <span class="text-sm text-gray-600">
+                          {log.type === 'initial_investment' ? '-' : formatCurrency(log.balance_after)}
+                        </span>
+                      </td>
+                      
+                      <!-- หมายเหตุ -->
+                      <td class="px-4 py-3">
+                        <div class="text-sm text-gray-600 max-w-[200px] truncate" title={log.notes || ''}>
+                          {log.notes || '-'}
+                        </div>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        {/if}
+      </div>
+      
+      <!-- Modal Footer -->
+      <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+        <div class="flex justify-between items-center">
+          <div class="text-sm text-gray-500">
+            {#if transactionLogs.length > 0}
+              แสดง {transactionLogs.length} รายการ
+            {/if}
+          </div>
+          <button 
+            class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+            on:click={closeTransactionHistory}
+          >
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 </div>
 
+<style>
+  /* Charts Section Styles */
+  .charts-section {
+    margin-bottom: 3rem;
+  }
+  
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .chart-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+  
+  .chart-card.full-width {
+    grid-column: 1 / -1;
+  }
+  
+  .chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 1rem;
+  }
+  
+  .chart-content {
+    min-height: 150px;
+  }
+  
+  /* ROI Bar Chart */
+  .roi-bar {
+    margin-bottom: 0.75rem;
+  }
+  
+  .roi-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .roi-rank {
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.875rem;
+    min-width: 1.5rem;
+  }
+  
+  .roi-name {
+    flex: 1;
+    font-size: 0.875rem;
+    color: #374151;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .roi-value {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+  
+  .roi-value.positive {
+    color: #10b981;
+  }
+  
+  .roi-value.negative {
+    color: #ef4444;
+  }
+  
+  .roi-bar-container {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .roi-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+  
+  .roi-bar-fill.positive {
+    background: linear-gradient(90deg, #10b981, #34d399);
+  }
+  
+  .roi-bar-fill.negative {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+  }
+  
+  /* Status Stats */
+  .status-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  
+  .status-indicator.active {
+    background: #10b981;
+  }
+  
+  .status-indicator.completed {
+    background: #3b82f6;
+  }
+  
+  .status-indicator.cancelled {
+    background: #ef4444;
+  }
+  
+  .status-label {
+    flex: 1;
+    font-size: 0.875rem;
+    color: #374151;
+  }
+  
+  .status-count {
+    font-weight: 600;
+    font-size: 1.125rem;
+    color: #1f2937;
+  }
+  
+  /* Monthly Chart */
+  .monthly-chart {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    height: 200px;
+    gap: 1rem;
+  }
+  
+  .monthly-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+  }
+  
+  .monthly-bars {
+    display: flex;
+    gap: 4px;
+    height: 150px;
+    align-items: flex-end;
+  }
+  
+  .bar-container {
+    width: 20px;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+  }
+  
+  .bar {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.3s ease;
+    min-height: 4px;
+  }
+  
+  .bar.invested {
+    background: linear-gradient(180deg, #ec4899, #f472b6);
+  }
+  
+  .bar.received {
+    background: linear-gradient(180deg, #10b981, #34d399);
+  }
+  
+  .monthly-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.5rem;
+    text-align: center;
+  }
+  
+  .monthly-count {
+    font-size: 0.625rem;
+    color: #9ca3af;
+  }
+  
+  .chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+  
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+  
+  .legend-color.invested {
+    background: linear-gradient(180deg, #ec4899, #f472b6);
+  }
+  
+  .legend-color.received {
+    background: linear-gradient(180deg, #10b981, #34d399);
+  }
+  
+  /* Product Table */
+  .product-table {
+    width: 100%;
+  }
+  
+  .table-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1fr;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+  }
+  
+  .table-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1fr;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+    align-items: center;
+  }
+  
+  .table-row:hover {
+    background: #f9fafb;
+  }
+  
+  .product-name {
+    font-weight: 500;
+    color: #1f2937;
+  }
+  
+  .no-data {
+    text-align: center;
+    color: #9ca3af;
+    padding: 2rem;
+    font-size: 0.875rem;
+  }
+  
+  /* Debug Info - hide in production */
+  .debug-info {
+    display: none; /* Change to 'block' to show debug info */
+  }
+</style>

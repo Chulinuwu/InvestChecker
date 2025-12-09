@@ -18,7 +18,7 @@ export const investmentService = {
       .from('investments')
       .select('*')
       .order('created_at', { ascending: false })
-    
+
     if (error) throw error
     return data
   },
@@ -29,7 +29,7 @@ export const investmentService = {
       .from('investments')
       .insert([investment])
       .select()
-    
+
     if (error) throw error
     return data[0]
   },
@@ -41,7 +41,7 @@ export const investmentService = {
       .update(updates)
       .eq('id', id)
       .select()
-    
+
     if (error) throw error
     return data[0]
   },
@@ -52,7 +52,7 @@ export const investmentService = {
       .from('investments')
       .delete()
       .eq('id', id)
-    
+
     if (error) throw error
   }
 }
@@ -64,11 +64,11 @@ export const transactionService = {
       .from('transactions')
       .select('*')
       .order('transaction_date', { ascending: false })
-    
+
     if (investmentId) {
       query = query.eq('investment_id', investmentId)
     }
-    
+
     const { data, error } = await query
     if (error) throw error
     return data
@@ -80,7 +80,7 @@ export const transactionService = {
       .from('transactions')
       .insert([transaction])
       .select()
-    
+
     if (error) throw error
     return data[0]
   }
@@ -93,7 +93,7 @@ export const settingsService = {
       .from('settings')
       .select('*')
       .limit(1)
-    
+
     if (error) throw error
     return data[0]
   },
@@ -105,8 +105,126 @@ export const settingsService = {
       .update(updates)
       .eq('id', 1)
       .select()
-    
+
     if (error) throw error
     return data[0]
+  }
+}
+
+// Investment Log Service - สำหรับ audit trail
+export const investmentLogService = {
+  // ดึงข้อมูล logs ทั้งหมด
+  async getLogs(investmentId: number | null = null) {
+    let query = supabase
+      .from('investment_logs')
+      .select(`
+        *,
+        investments (
+          id,
+          product_type,
+          supplier,
+          customer
+        )
+      `)
+      .order('transaction_date', { ascending: false })
+
+    if (investmentId) {
+      query = query.eq('investment_id', investmentId)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return data
+  },
+
+  // บันทึก log เมื่อสร้าง investment ใหม่ (เงินออก)
+  async logInitialInvestment(investmentId: number, amount: number, notes: string = '') {
+    const log = {
+      investment_id: investmentId,
+      amount: -Math.abs(amount), // เงินออก = ค่าลบ
+      type: 'initial_investment',
+      transaction_date: new Date().toISOString(),
+      notes: notes || 'สร้างการลงทุนใหม่',
+      balance_before: 0,
+      balance_after: 0
+    }
+
+    const { data, error } = await supabase
+      .from('investment_logs')
+      .insert([log])
+      .select()
+
+    if (error) throw error
+    return data[0]
+  },
+
+  // บันทึก log เมื่อมีเงินเข้า (deposit)
+  async logDeposit(investmentId: number, amount: number, balanceBefore: number, notes: string = '') {
+    const log = {
+      investment_id: investmentId,
+      amount: Math.abs(amount), // เงินเข้า = ค่าบวก
+      type: 'deposit',
+      transaction_date: new Date().toISOString(),
+      notes: notes || 'รับเงินคืน',
+      balance_before: balanceBefore,
+      balance_after: balanceBefore + Math.abs(amount)
+    }
+
+    const { data, error } = await supabase
+      .from('investment_logs')
+      .insert([log])
+      .select()
+
+    if (error) throw error
+    return data[0]
+  },
+
+  // บันทึก log เมื่อมีเงินออก (withdrawal) - กรณีปรับลดยอด
+  async logWithdrawal(investmentId: number, amount: number, balanceBefore: number, notes: string = '') {
+    const log = {
+      investment_id: investmentId,
+      amount: -Math.abs(amount), // เงินออก = ค่าลบ
+      type: 'withdrawal',
+      transaction_date: new Date().toISOString(),
+      notes: notes || 'ปรับลดยอด',
+      balance_before: balanceBefore,
+      balance_after: balanceBefore - Math.abs(amount)
+    }
+
+    const { data, error } = await supabase
+      .from('investment_logs')
+      .insert([log])
+      .select()
+
+    if (error) throw error
+    return data[0]
+  },
+
+  // ดึงสรุป logs
+  async getLogsSummary() {
+    const { data, error } = await supabase
+      .from('investment_logs')
+      .select('*')
+
+    if (error) throw error
+
+    const summary = {
+      totalDeposits: 0,
+      totalWithdrawals: 0,
+      totalInitialInvestments: 0,
+      transactionCount: data?.length || 0
+    }
+
+    data?.forEach(log => {
+      if (log.type === 'deposit') {
+        summary.totalDeposits += Math.abs(log.amount)
+      } else if (log.type === 'withdrawal') {
+        summary.totalWithdrawals += Math.abs(log.amount)
+      } else if (log.type === 'initial_investment') {
+        summary.totalInitialInvestments += Math.abs(log.amount)
+      }
+    })
+
+    return summary
   }
 }
