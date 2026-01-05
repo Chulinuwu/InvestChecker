@@ -561,9 +561,9 @@
   }
 </script>
 
-<div class="min-h-screen bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white flex items-center justify-center p-4">
-  {#if !isAuthenticated}
-    <!-- Login Screen -->
+{#if !isAuthenticated}
+  <!-- Login Screen -->
+  <div class="min-h-screen bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white flex items-center justify-center p-4">
     <div class="w-full max-w-[400px]">
       <div class="overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100">
         <!-- Header Section -->
@@ -647,8 +647,10 @@
         </div>
       </div>
     </div>
-  {:else}
-    <!-- Main Application (ถ้าผ่าน login แล้ว) -->
+  </div>
+{:else}
+  <!-- Main Application (ถ้าผ่าน login แล้ว) -->
+  <div class="min-h-screen bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white flex flex-col">
   <header class="bg-indigo-600 text-white py-8 shadow-lg shadow-indigo-200/50">
     <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
       <div class=" flex-1">
@@ -1083,7 +1085,7 @@
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-static-element-interactions -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation role="document">
+          <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation={() => {}} role="document">
             <div class="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <span class="text-2xl">💰</span>
@@ -1179,7 +1181,7 @@
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y-no-static-element-interactions -->
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation role="document">
+          <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation={() => {}} role="document">
             <div class="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <span class="text-2xl">✏️</span>
@@ -1339,20 +1341,22 @@
         <section class="space-y-6">
           <!-- Filter Section -->
           <div class="bg-white rounded-lg shadow-lg border border-pink-200 p-6">
-            <div class="flex flex-col sm:flex-row gap-4 items-center">
+            <div class="flex flex-col gap-4">
+              <!-- Header -->
               <div class="flex items-center gap-2 text-lg font-medium text-gray-700">
                 <span>🔍</span>
                 <span>กรองและค้นหา</span>
               </div>
               
-              <div class="flex flex-col sm:flex-row gap-4 flex-1">
+              <!-- Filters Container -->
+              <div class="flex flex-col sm:flex-row gap-4">
                 <!-- Status Filter -->
-                <div class="flex items-center gap-2">
-                  <label for="status-filter" class="text-sm font-medium text-gray-600">สถานะ:</label>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <label for="status-filter" class="text-sm font-medium text-gray-600 whitespace-nowrap">สถานะ:</label>
                   <select 
                     id="status-filter" 
                     bind:value={filterStatus}
-                    class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                    class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
                   >
                     <option value="all">ทั้งหมด</option>
                     <option value="active">กำลังดำเนินการ</option>
@@ -1362,24 +1366,26 @@
                 </div>
                 
                 <!-- Search Input -->
-                <div class="flex items-center gap-2 flex-1">
-                  <label for="search-input" class="text-sm font-medium text-gray-600">ค้นหา:</label>
-                  <input 
-                    id="search-input"
-                    type="text" 
-                    bind:value={searchQuery}
-                    placeholder="ค้นหาจาก ID, ประเภทสินค้า, ซัพพลายเออร์, ลูกค้า, หมายเหตุ..."
-                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                  {#if searchQuery}
-                    <button 
-                      on:click={() => searchQuery = ''}
-                      class="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors"
-                      title="ล้างการค้นหา"
-                    >
-                      <span class="text-lg">✕</span>
-                    </button>
-                  {/if}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1">
+                  <label for="search-input" class="text-sm font-medium text-gray-600 whitespace-nowrap">ค้นหา:</label>
+                  <div class="flex items-center gap-2 flex-1">
+                    <input 
+                      id="search-input"
+                      type="text" 
+                      bind:value={searchQuery}
+                      placeholder="ค้นหาจาก ID, ประเภทสินค้า..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                    />
+                    {#if searchQuery}
+                      <button 
+                        on:click={() => searchQuery = ''}
+                        class="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+                        title="ล้างการค้นหา"
+                      >
+                        <span class="text-lg">✕</span>
+                      </button>
+                    {/if}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1636,12 +1642,14 @@
       <p class="opacity-90">© Chulinx Folio, All Right Reserved | Implemented by Svelte+Supabase</p>
     </div>
   </footer>
-  {/if}
 
 <!-- Transaction History Modal -->
 {#if showTransactionHistory}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" on:click={closeTransactionHistory}>
-    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" on:click|stopPropagation>
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" on:click|stopPropagation={() => {}}>
+
       <!-- Modal Header -->
       <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
         <div class="flex justify-between items-center">
@@ -1883,6 +1891,7 @@
   </div>
 {/if}
 </div>
+{/if}
 
 <style>
   /* Charts Section Styles */
