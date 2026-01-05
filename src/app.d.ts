@@ -10,14 +10,16 @@ declare global {
 	}
 
 	interface ImportMetaEnv {
-		readonly VITE_SUPABASE_URL: string
-		readonly VITE_SUPABASE_ANON_KEY: string
-		readonly VITE_LOGIN_USERNAME: string
-		readonly VITE_LOGIN_PASSWORD: string
+		readonly VITE_SUPABASE_URL: string;
+		readonly VITE_SUPABASE_ANON_KEY: string;
+		readonly VITE_LOGIN_USERNAME: string;
+		readonly VITE_LOGIN_PASSWORD: string;
+		readonly VITE_LOGIN_USERNAME_2: string;
+		readonly VITE_LOGIN_PASSWORD_2: string;
 	}
 
 	interface ImportMeta {
-		readonly env: ImportMetaEnv
+		readonly env: ImportMetaEnv;
 	}
 }
 

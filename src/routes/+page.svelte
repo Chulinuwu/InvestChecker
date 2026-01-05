@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { goto } from '$app/navigation'
   import { investmentService, investmentLogService } from '$lib/supabase'
   
   // Login state
@@ -49,6 +50,13 @@
   onMount(async () => {
     // Check if already logged in (from localStorage)
     const savedAuth = localStorage.getItem('isAuthenticated')
+    const savedAdminAuth = localStorage.getItem('isAdminAuthenticated')
+
+    if (savedAdminAuth === 'true') {
+      goto('/backoffice')
+      return
+    }
+
     if (savedAuth === 'true') {
       isAuthenticated = true
       await loadInvestments()
@@ -61,13 +69,23 @@
     const validUsername = import.meta.env.VITE_LOGIN_USERNAME
     const validPassword = import.meta.env.VITE_LOGIN_PASSWORD
     
+    // Admin / Backoffice User
+    const adminUsername = import.meta.env.VITE_LOGIN_USERNAME_2
+    const adminPassword = import.meta.env.VITE_LOGIN_PASSWORD_2
+
+    if (loginUsername === adminUsername && loginPassword === adminPassword) {
+      localStorage.setItem('isAdminAuthenticated', 'true')
+      goto('/backoffice')
+      return;
+    }
+
     if (loginUsername === validUsername && loginPassword === validPassword) {
       isAuthenticated = true
       localStorage.setItem('isAuthenticated', 'true')
       loginError = ''
       loadInvestments()
     } else {
-      loginError = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+      loginError = 'ชื่อผู้ใช้หรือ rหัสผ่านไม่ถูกต้อง'
     }
   }
 
@@ -543,144 +561,200 @@
   }
 </script>
 
-<div class="min-h-screen bg-gray-50 font-sans text-gray-800">
+<div class="min-h-screen bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white flex items-center justify-center p-4">
   {#if !isAuthenticated}
     <!-- Login Screen -->
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-100 to-pink-200">
-      <div class="max-w-md w-full mx-4">
-        <div class="bg-white rounded-2xl shadow-2xl p-8">
-          <div class="text-center mb-8">
-            <div class="text-6xl mb-4">🔐</div>
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">Twenty Toys</h1>
-            <p class="text-gray-600">Investment Tracking System</p>
+    <div class="w-full max-w-[400px]">
+      <div class="overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100">
+        <!-- Header Section -->
+        <div class="bg-[#1e293b] p-10 text-center text-white relative overflow-hidden">
+          <!-- Logo -->
+          <div class="relative z-10 mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-2xl bg-white shadow-xl overflow-hidden ring-4 ring-white/10">
+            <img src="/Twentytoy.jpg" alt="Twenty Toys Logo" class="h-full w-full object-cover" />
           </div>
           
+          <div class="relative z-10">
+            <h1 class="mb-2 text-2xl font-bold tracking-tight">Welcome Back</h1>
+            <p class="text-slate-400 text-sm font-medium">Twenty Toys Investment Tracker</p>
+          </div>
+          
+          <!-- Decorative subtle pattern/circles -->
+          <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
+          <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-slate-500/10 rounded-full blur-2xl"></div>
+        </div>
+
+        <!-- Form Section -->
+        <div class="px-8 py-10">
           <form on:submit|preventDefault={handleLogin} class="space-y-6">
             <div class="space-y-2">
-              <label for="username" class="block text-sm font-medium text-gray-700">ชื่อผู้ใช้</label>
-              <input 
-                type="text" 
-                id="username" 
-                bind:value={loginUsername}
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors"
-                placeholder="กรอกชื่อผู้ใช้"
-              />
+              <label for="username" class="block text-sm font-semibold text-slate-600 ml-1">Username</label>
+              <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                  <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <input 
+                  type="text" 
+                  id="username" 
+                  bind:value={loginUsername}
+                  required
+                  class="block w-full rounded-2xl border-0 bg-slate-100 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all"
+                  placeholder="admin@gmail.com"
+                />
+              </div>
             </div>
             
             <div class="space-y-2">
-              <label for="password" class="block text-sm font-medium text-gray-700">รหัสผ่าน</label>
-              <input 
-                type="password" 
-                id="password" 
-                bind:value={loginPassword}
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors"
-                placeholder="กรอกรหัสผ่าน"
-              />
+              <label for="password" class="block text-sm font-semibold text-slate-600 ml-1">Password</label>
+              <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                  <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <input 
+                  type="password" 
+                  id="password" 
+                  bind:value={loginPassword}
+                  required
+                  class="block w-full rounded-2xl border-0 bg-slate-100 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all"
+                  placeholder="••••••••••••"
+                />
+              </div>
             </div>
             
             {#if loginError}
-              <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2">
-                <span>⚠️</span>
+              <div class="flex items-center gap-3 rounded-2xl bg-red-50 p-4 text-sm font-medium text-red-600 border border-red-100">
+                <svg class="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
                 <span>{loginError}</span>
               </div>
             {/if}
             
             <button 
               type="submit" 
-              class="w-full bg-pink-500 hover:bg-pink-600 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+              class="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-base font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>🚀</span>
-              เข้าสู่ระบบ
+              Sign In
             </button>
           </form>
-          
-          <div class="mt-8 text-center text-sm text-gray-500">
-            <p>ระบบติดตามการลงทุน</p>
-            <p class="mt-1">© Twenty Toys Investment Tracker</p>
-          </div>
+        </div>
+        
+        <div class="border-t border-slate-50 bg-slate-50/50 p-6 text-center">
+          <p class="text-xs text-slate-400 font-medium">© {new Date().getFullYear()} Twenty Toys System</p>
         </div>
       </div>
     </div>
   {:else}
     <!-- Main Application (ถ้าผ่าน login แล้ว) -->
-  <header class="bg-pink-400 text-white py-8">
+  <header class="bg-indigo-600 text-white py-8 shadow-lg shadow-indigo-200/50">
     <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
       <div class=" flex-1">
-        <h1 class="text-4xl font-bold mb-2">Twenty Toys</h1>
-        <p class="opacity-90 text-lg">Track your investment</p>
+        <h1 class="text-3xl font-bold mb-1 tracking-tight">Twenty Toys</h1>
+        <p class="text-indigo-200 text-sm font-medium">Investment Portfolio Tracker</p>
       </div>
       <button 
         on:click={handleLogout}
-        class="bg-white text-pink-300 hover:text-pink-500 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
+        class="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 backdrop-blur-sm"
       >
-        ออกจากระบบ
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+        Sign Out
       </button>
     </div>
   </header>
 
-  <main class="py-8">
+  <main class="py-10">
     <div class="max-w-6xl mx-auto px-4">
       <!-- Summary Cards -->
       <section class="mb-12">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center gap-2">Overview</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-            <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">💰</div>
+        <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <span class="inline-block w-1 h-6 bg-indigo-500 rounded-full"></span>
+            Overview
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
+            <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            </div>
             <div class="flex-1">
-              <h3 class="text-sm text-gray-600 font-medium mb-1">เงินลงทุนรวม</h3>
-              <p class="text-2xl font-bold text-gray-800">{totalInvested.toLocaleString()}</p>
-              <span class="text-sm text-gray-500">บาท</span>
+              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Total Invested</h3>
+              <p class="text-2xl font-bold text-slate-900">{totalInvested.toLocaleString()}</p>
+              <span class="text-xs text-slate-400">THB</span>
             </div>
           </div>
           
-          <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-            <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">💵</div>
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
+            <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-300">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
             <div class="flex-1">
-              <h3 class="text-sm text-gray-600 font-medium mb-1">เงินที่ได้รับแล้ว</h3>
-              <p class="text-2xl font-bold text-green-600">{totalReceived.toLocaleString()}</p>
-              <span class="text-sm text-gray-500">บาท</span>
+              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Total Received</h3>
+              <p class="text-2xl font-bold text-emerald-600">{totalReceived.toLocaleString()}</p>
+              <span class="text-xs text-slate-400">THB</span>
             </div>
           </div>
           
-          <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-            <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">{totalProfit >= 0 ? '📈' : '📉'}</div>
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
+            <div class="w-14 h-14 {totalProfit >= 0 ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600' : 'bg-red-50 text-red-600 group-hover:bg-red-600'} rounded-2xl flex items-center justify-center group-hover:text-white transition-colors duration-300">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            </div>
             <div class="flex-1">
-              <h3 class="text-sm text-gray-600 font-medium mb-1">กำไร/ขาดทุน</h3>
-              <p class="text-2xl font-bold {totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}">
+              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Net Profit</h3>
+              <p class="text-2xl font-bold {totalProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}">
                 {totalProfit >= 0 ? '+' : ''}{totalProfit.toLocaleString()}
               </p>
-              <span class="text-sm text-gray-500">บาท</span>
+              <span class="text-xs text-slate-400">THB</span>
             </div>
           </div>
           
-          <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-            <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">🎯</div>
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
+            <div class="w-14 h-14 {overallROI >= 0 ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600' : 'bg-red-50 text-red-600 group-hover:bg-red-600'} rounded-2xl flex items-center justify-center group-hover:text-white transition-colors duration-300">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
             <div class="flex-1">
-              <h3 class="text-sm text-gray-600 font-medium mb-1">ROI รวม</h3>
-              <p class="text-2xl font-bold {overallROI >= 0 ? 'text-green-600' : 'text-red-600'}">
+              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Overall ROI</h3>
+              <p class="text-2xl font-bold {overallROI >= 0 ? 'text-indigo-600' : 'text-red-600'}">
                 {overallROI >= 0 ? '+' : ''}{overallROI.toFixed(1)}
               </p>
-              <span class="text-sm text-gray-500">%</span>
-          </div>
-          </div>
-          
-          <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-            <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">🔄</div>
-            <div class="flex-1">
-              <h3 class="text-sm text-gray-600 font-medium mb-1">กำลังดำเนินการ</h3>
-              <p class="text-2xl font-bold text-pink-600">{activeInvestments.length}</p>
-              <span class="text-sm text-gray-500">รอบ</span>
+              <span class="text-xs text-slate-400">%</span>
             </div>
           </div>
           
-          <div class="bg-white border border-gray-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-            <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-2xl">✅</div>
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
+            <div class="w-14 h-14 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-colors duration-300">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
             <div class="flex-1">
-              <h3 class="text-sm text-gray-600 font-medium mb-1">เสร็จสิ้นแล้ว</h3>
+              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Active Deals</h3>
+              <p class="text-2xl font-bold text-orange-600">{activeInvestments.length}</p>
+              <span class="text-xs text-slate-400">In Progress</span>
+            </div>
+          </div>
+          
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
+            <div class="w-14 h-14 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-colors duration-300">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Completed</h3>
               <p class="text-2xl font-bold text-green-600">{completedInvestments.length}</p>
-              <span class="text-sm text-gray-500">รอบ</span>
+              <span class="text-xs text-slate-400">Success</span>
             </div>
           </div>
         </div>
@@ -696,7 +770,7 @@
       <!-- Action Bar -->
       <section class="mb-12">
         <div class="flex flex-wrap gap-4">
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-pink-500 text-white rounded-lg font-medium hover:bg-pink-600 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => {
+          <button class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => {
             showAddForm = !showAddForm
             showEditModal = false
             editingInvestment = null
@@ -704,49 +778,49 @@
             if (showAddForm) resetForm()
           }}>
             <span>{showAddForm ? '❌' : '➕'}</span>
-            {showAddForm ? 'ยกเลิก' : 'เพิ่มการลงทุนใหม่'}
+            {showAddForm ? 'Cancel' : 'Add Investment'}
           </button>
           
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => showCharts = !showCharts}>
+          <button class="inline-flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => showCharts = !showCharts}>
             <span>📊</span>
-            {showCharts ? 'ซ่อนกราฟ' : 'แสดงกราฟ'}
+            {showCharts ? 'Hide Charts' : 'Show Charts'}
           </button>
           
           
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-600 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => openTransactionHistory(null)}>
+          <button class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => openTransactionHistory(null)}>
             <span>📜</span>
-            ประวัติธุรกรรม
+            Transactions
           </button>
           
           <!-- Quick Filter Buttons -->
           <div class="flex flex-wrap gap-2 ml-auto">
             <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'all' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
               on:click={() => filterStatus = 'all'}
             >
               <span>📋</span>
-              ทั้งหมด
+              All
             </button>
             <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'active' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'active' ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
               on:click={() => filterStatus = 'active'}
             >
               <span>🔄</span>
-              กำลังดำเนินการ
+              Active
             </button>
             <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'completed' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
               on:click={() => filterStatus = 'completed'}
             >
               <span>✅</span>
-              เสร็จสิ้น
+              Completed
             </button>
             <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'cancelled' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-md font-medium transition-colors duration-200"
+              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'cancelled' ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
               on:click={() => filterStatus = 'cancelled'}
             >
               <span>❌</span>
-              ยกเลิก
+              Cancelled
             </button>
           </div>
         </div>
@@ -755,7 +829,7 @@
       <!-- Charts Section -->
       {#if showCharts}
         <section class="charts-section">
-          <h2 class="section-title">📈 กราฟและสถิติ</h2>
+          <h2 class="section-title">📈 Analytics and Statistics</h2>
           
           <!-- Debug Info -->
           <div class="debug-info" style="background: #f0f0f0; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem;">
@@ -769,7 +843,7 @@
           <div class="charts-grid">
             <!-- ROI Comparison Chart -->
             <div class="chart-card">
-              <h3 class="chart-title">🏆 TOP 5 การลงทุนที่ให้ผลตอบแทนดีที่สุด</h3>
+              <h3 class="chart-title">🏆 Top 5 ROI Investments</h3>
               <div class="chart-content">
                 {#each chartData.roiComparison as item, index}
                   <div class="roi-bar">
@@ -789,38 +863,41 @@
                   </div>
                 {/each}
                 {#if chartData.roiComparison.length === 0}
-                  <p class="no-data">ยังไม่มีข้อมูลผลตอบแทน</p>
+                  <p class="no-data">No ROI data available</p>
                 {/if}
               </div>
             </div>
 
             <!-- Status Distribution -->
             <div class="chart-card">
-              <h3 class="chart-title">📊 สถานะการลงทุน</h3>
+              <h3 class="chart-title">📊 Investment Status</h3>
               <div class="chart-content">
-                <div class="status-stats">
-                  <div class="status-item">
-                    <div class="status-indicator active"></div>
-                    <span class="status-label">กำลังดำเนินการ</span>
-                    <span class="status-count">{chartData.statusDistribution.active}</span>
+                {#if Object.values(chartData.statusDistribution).some(v => v > 0)}
+                  <div class="status-chart">
+                    {#each Object.entries(chartData.statusDistribution) as [status, count]}
+                      {#if count > 0}
+                        <div class="status-bar-item">
+                          <span class="status-label">{status}</span>
+                          <div class="status-bar-track">
+                             <div 
+                               class="status-bar-fill status-{status}" 
+                               style="width: {(count / investments.length) * 100}%"
+                             ></div>
+                          </div>
+                          <span class="status-count">{count} ({(count / investments.length * 100).toFixed(0)}%)</span>
+                        </div>
+                      {/if}
+                    {/each}
                   </div>
-                  <div class="status-item">
-                    <div class="status-indicator completed"></div>
-                    <span class="status-label">เสร็จสิ้น</span>
-                    <span class="status-count">{chartData.statusDistribution.completed}</span>
-                  </div>
-                  <div class="status-item">
-                    <div class="status-indicator cancelled"></div>
-                    <span class="status-label">ยกเลิก</span>
-                    <span class="status-count">{chartData.statusDistribution.cancelled || 0}</span>
-                  </div>
-                </div>
+                {:else}
+                  <p class="no-data">No Status data available</p>
+                {/if}
               </div>
             </div>
 
             <!-- Monthly Investment Trend -->
             <div class="chart-card full-width">
-              <h3 class="chart-title">📅 แนวโน้มการลงทุนรายเดือน (6 เดือนล่าสุด)</h3>
+              <h3 class="chart-title">📅 Monthly Investment Trend (Last 6 Months)</h3>
               <div class="chart-content">
                 {#if chartData.monthly.length > 0}
                   <div class="monthly-chart">
@@ -831,26 +908,26 @@
                             <div 
                               class="bar invested" 
                               style="height: {(data.invested / Math.max(...chartData.monthly.map(([,d]) => (d as any).invested))) * 100}%"
-                              title="ลงทุน: {data.invested.toLocaleString()} บาท"
+                              title="Invested: {data.invested.toLocaleString()} THB"
                             ></div>
                           </div>
                           <div class="bar-container">
                             <div 
                               class="bar received" 
                               style="height: {(data.received / Math.max(...chartData.monthly.map(([,d]) => (d as any).invested))) * 100}%"
-                              title="ได้รับ: {data.received.toLocaleString()} บาท"
+                              title="Received: {data.received.toLocaleString()} THB"
                             ></div>
                           </div>
                         </div>
                         <div class="monthly-label">{month}</div>
-                        <div class="monthly-count">{data.count} รอบ</div>
+                        <div class="monthly-count">{data.count} Deals</div>
                       </div>
                     {/each}
                   </div>
                   <div class="chart-legend">
                     <div class="legend-item">
                       <div class="legend-color invested"></div>
-                      <span>เงินลงทุน</span>
+                      <span>Invested Amount</span>
                     </div>
                     <div class="legend-item">
                       <div class="legend-color received"></div>

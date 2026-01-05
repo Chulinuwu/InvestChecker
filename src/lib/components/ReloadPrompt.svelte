@@ -35,20 +35,18 @@
 	});
 </script>
 
-{#if offlineReady || needRefresh}
+{#if needRefresh}
 	<div class="pwa-toast" role="alert">
 		<div class="pwa-message">
-			{#if offlineReady}
-				<span>🎉 แอปพร้อมใช้งานแบบออฟไลน์แล้ว!</span>
-			{:else}
-				<span>🔄 มีเวอร์ชันใหม่พร้อมใช้งาน</span>
-			{/if}
+			<span>🔄 มีเวอร์ชันใหม่พร้อมใช้งาน</span>
 		</div>
 		<div class="pwa-buttons">
-			{#if needRefresh}
-				<button class="pwa-refresh" onclick={() => updateServiceWorker(true)}> อัปเดต </button>
-			{/if}
-			<button class="pwa-close" onclick={close}> ปิด </button>
+			<button class="pwa-refresh" onclick={() => updateServiceWorker(true)}>
+				อัปเดต
+			</button>
+			<button class="pwa-close" onclick={close}>
+				ปิด
+			</button>
 		</div>
 	</div>
 {/if}
