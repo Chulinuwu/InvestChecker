@@ -1,14 +1,8 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
-  "routes": [
-    {
-      "src": "^/_app/(.*)",
-      "dest": "/_app/$1"
-    },
-    {
-      "src": "^/(.*)",
-      "dest": "/index.html"
-    }
+  "rewrites": [
+    { "source": "/_app/(.*)", "destination": "/_app/$1" },
+    { "source": "/((?!_app|favicon.ico|icon-).* )", "destination": "/index.html" }
   ]
 }
