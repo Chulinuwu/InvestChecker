@@ -28,6 +28,7 @@
 		quantity: number;
 		total_price: number;
 		status: string;
+		payment_status: boolean;
 		created_at: string;
 	}
 
@@ -39,6 +40,7 @@
 		total_items: number;
 		total_price: number;
 		status: string;
+		payment_status: boolean;
 		created_at: string;
 	}
 
@@ -133,6 +135,21 @@
 			// อัปเดต local state ทุก item ที่อยู่ในกลุ่มเดียวกัน
 			preorderLogs = preorderLogs.map((log) =>
 				log.order_group_id === orderGroupId ? { ...log, status: newStatus } : log
+			);
+		}
+	}
+
+	async function updatePaymentStatus(orderGroupId: string, newPaidStatus: boolean) {
+		const { error } = await supabase
+			.from('preorder_logs')
+			.update({ payment_status: newPaidStatus })
+			.eq('order_group_id', orderGroupId);
+
+		if (error) {
+			alert('Error updating payment status: ' + error.message);
+		} else {
+			preorderLogs = preorderLogs.map((log) =>
+				log.order_group_id === orderGroupId ? { ...log, payment_status: newPaidStatus } : log
 			);
 		}
 	}
@@ -331,6 +348,7 @@
 					total_items: log.quantity,
 					total_price: log.total_price,
 					status: log.status,
+					payment_status: log.payment_status || false,
 					created_at: log.created_at
 				});
 			}
@@ -558,12 +576,31 @@
 									</div>
 								</div>
 
-								<!-- Summary -->
-								<div class="text-right">
-									<p class="text-xs text-slate-400">{order.total_items} ชิ้น</p>
-									<p class="text-lg font-bold text-indigo-600">
-										฿{order.total_price.toLocaleString()}
-									</p>
+								<div class="flex items-center gap-6">
+									<!-- Summary -->
+									<div class="text-right">
+										<p class="text-xs text-slate-400">{order.total_items} ชิ้น</p>
+										<p class="text-lg font-bold text-indigo-600">
+											฿{order.total_price.toLocaleString()}
+										</p>
+									</div>
+
+									<!-- Payment Toggle -->
+									<div class="flex items-center gap-2 border-l border-slate-100 pl-6">
+										<span class="text-[10px] font-bold text-slate-400">PAID</span>
+										<button
+											type="button"
+											onclick={() =>
+												updatePaymentStatus(order.order_group_id, !order.payment_status)}
+											class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none
+											{order.payment_status ? 'bg-emerald-500' : 'bg-slate-200'}"
+										>
+											<span
+												class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+												{order.payment_status ? 'translate-x-5' : 'translate-x-0'}"
+											></span>
+										</button>
+									</div>
 								</div>
 							</div>
 
@@ -634,7 +671,7 @@
 																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
 															>
 																<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
-																Complete
+																Product arrived
 															</button>
 															<button
 																onclick={() => updateOrderStatus(item.id, 'fail')}
@@ -674,6 +711,23 @@
 										</p>
 										<h4 class="font-bold text-slate-900">{order.user_display_name || 'Unknown'}</h4>
 										<p class="font-mono text-[10px] text-slate-400">{order.user_line_id}</p>
+									</div>
+
+									<!-- Payment Toggle (Mobile) -->
+									<div class="flex flex-col items-end gap-1">
+										<span class="text-[8px] font-bold text-slate-400">PAYMENT</span>
+										<button
+											type="button"
+											onclick={() =>
+												updatePaymentStatus(order.order_group_id, !order.payment_status)}
+											class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none
+											{order.payment_status ? 'bg-emerald-500' : 'bg-slate-200'}"
+										>
+											<span
+												class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+												{order.payment_status ? 'translate-x-5' : 'translate-x-0'}"
+											></span>
+										</button>
 									</div>
 								</div>
 							</div>
@@ -750,7 +804,7 @@
 																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-emerald-700 hover:bg-emerald-50"
 															>
 																<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
-																Complete
+																Product arrived
 															</button>
 															<button
 																onclick={() => updateOrderStatus(item.id, 'fail')}
@@ -768,14 +822,34 @@
 								{/each}
 							</div>
 
-							<!-- Order Total -->
+							<!-- Order Total (Mobile) -->
 							<div
 								class="flex items-center justify-between overflow-hidden rounded-b-2xl bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3"
 							>
-								<span class="text-sm font-medium text-slate-600">รวม {order.total_items} ชิ้น</span>
-								<span class="text-lg font-bold text-indigo-600"
-									>฿{order.total_price.toLocaleString()}</span
-								>
+								<div class="flex flex-col">
+									<span class="text-[10px] font-medium text-slate-500"
+										>ยอดรวมทั้งหมด {order.total_items} ชิ้น</span
+									>
+									<span class="text-lg font-bold text-indigo-600"
+										>฿{order.total_price.toLocaleString()}</span
+									>
+								</div>
+
+								<!-- Mobile Payment Toggle Moved to Bottom Right near total -->
+								<div class="flex items-center gap-2 rounded-xl bg-white/50 px-3 py-1.5 shadow-sm">
+									<span class="text-[8px] font-bold text-slate-400">PAID</span>
+									<button
+										type="button"
+										onclick={() => updatePaymentStatus(order.order_group_id, !order.payment_status)}
+										class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none
+										{order.payment_status ? 'bg-emerald-500' : 'bg-slate-200'}"
+									>
+										<span
+											class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+											{order.payment_status ? 'translate-x-5' : 'translate-x-0'}"
+										></span>
+									</button>
+								</div>
 							</div>
 						</div>
 					{/each}
