@@ -1,8 +1,0 @@
-{
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    { "source": "/_app/(.*)", "destination": "/_app/$1" },
-    { "source": "/((?!_app|favicon.ico|icon-).* )", "destination": "/index.html" }
-  ]
-}
