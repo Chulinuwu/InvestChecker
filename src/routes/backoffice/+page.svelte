@@ -20,11 +20,23 @@
 
 	interface PreorderLog {
 		id: string;
+		order_group_id: string;
 		product_code: string;
 		product_name: string;
 		user_line_id: string;
 		user_display_name: string | null;
 		quantity: number;
+		total_price: number;
+		status: string;
+		created_at: string;
+	}
+
+	interface GroupedOrder {
+		order_group_id: string;
+		user_line_id: string;
+		user_display_name: string | null;
+		items: PreorderLog[];
+		total_items: number;
 		total_price: number;
 		status: string;
 		created_at: string;
@@ -108,6 +120,23 @@
 		}
 	}
 
+	// อัปเดตสถานะทั้ง group พร้อมกัน
+	async function updateGroupStatus(orderGroupId: string, newStatus: string) {
+		const { error } = await supabase
+			.from('preorder_logs')
+			.update({ status: newStatus })
+			.eq('order_group_id', orderGroupId);
+
+		if (error) {
+			alert('Error updating group status: ' + error.message);
+		} else {
+			// อัปเดต local state ทุก item ที่อยู่ในกลุ่มเดียวกัน
+			preorderLogs = preorderLogs.map((log) =>
+				log.order_group_id === orderGroupId ? { ...log, status: newStatus } : log
+			);
+		}
+	}
+
 	async function deleteProduct(id: string) {
 		if (!confirm('Are you sure you want to delete this product?')) return;
 
@@ -172,9 +201,13 @@
 					canvas.height = height;
 					const ctx = canvas.getContext('2d');
 					ctx?.drawImage(img, 0, 0, width, height);
-					canvas.toBlob((blob) => {
-						if (blob) resolve(blob);
-					}, 'image/jpeg', 0.82);
+					canvas.toBlob(
+						(blob) => {
+							if (blob) resolve(blob);
+						},
+						'image/jpeg',
+						0.82
+					);
 				};
 			};
 			reader.onerror = (error) => reject(error);
@@ -186,16 +219,14 @@
 			const compressedBlob = await compressImage(file);
 			const fileExt = file.name.split('.').pop();
 			const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-			
+
 			const { data, error } = await supabase.storage
 				.from('twentytoys')
 				.upload(fileName, compressedBlob);
 
 			if (error) throw error;
 
-			const { data: publicUrlData } = supabase.storage
-				.from('twentytoys')
-				.getPublicUrl(data.path);
+			const { data: publicUrlData } = supabase.storage.from('twentytoys').getPublicUrl(data.path);
 
 			return publicUrlData.publicUrl;
 		} catch (err) {
@@ -277,6 +308,38 @@
 				p.product_code.toLowerCase().includes(searchTerm.toLowerCase())
 		)
 	);
+
+	// จัดกลุ่มออเดอร์ตาม order_group_id
+	let groupedOrders = $derived(() => {
+		const groups = new Map<string, GroupedOrder>();
+
+		for (const log of preorderLogs) {
+			// ใช้ order_group_id ถ้ามี ไม่งั้นใช้ id (สำหรับข้อมูลเก่า)
+			const groupId = log.order_group_id || log.id;
+
+			if (groups.has(groupId)) {
+				const group = groups.get(groupId)!;
+				group.items.push(log);
+				group.total_items += log.quantity;
+				group.total_price += log.total_price;
+			} else {
+				groups.set(groupId, {
+					order_group_id: groupId,
+					user_line_id: log.user_line_id,
+					user_display_name: log.user_display_name,
+					items: [log],
+					total_items: log.quantity,
+					total_price: log.total_price,
+					status: log.status,
+					created_at: log.created_at
+				});
+			}
+		}
+
+		return Array.from(groups.values()).sort(
+			(a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+		);
+	});
 </script>
 
 <div class="min-h-screen bg-slate-50 pb-20 text-slate-900 md:pb-10">
@@ -289,14 +352,16 @@
 				>
 					<span class="text-base font-bold">TT</span>
 				</div>
-				<h1 class="hidden text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent sm:block">
+				<h1
+					class="hidden bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-xl font-bold text-transparent sm:block"
+				>
 					Backoffice
 				</h1>
 			</div>
 
 			<div class="flex rounded-lg bg-slate-100 p-1">
 				<button
-					class="w-24 sm:w-32 rounded-md py-1.5 text-[11px] sm:text-sm font-medium transition-all {activeTab ===
+					class="w-24 rounded-md py-1.5 text-[11px] font-medium transition-all sm:w-32 sm:text-sm {activeTab ===
 					'products'
 						? 'bg-white text-indigo-600 shadow-sm'
 						: 'text-slate-500 hover:text-slate-700'}"
@@ -305,7 +370,7 @@
 					Products
 				</button>
 				<button
-					class="w-24 sm:w-32 rounded-md py-1.5 text-[11px] sm:text-sm font-medium transition-all {activeTab ===
+					class="w-24 rounded-md py-1.5 text-[11px] font-medium transition-all sm:w-32 sm:text-sm {activeTab ===
 					'preorders'
 						? 'bg-white text-indigo-600 shadow-sm'
 						: 'text-slate-500 hover:text-slate-700'}"
@@ -314,13 +379,13 @@
 					Pre-orders
 				</button>
 			</div>
-			
-			<button 
+
+			<button
 				onclick={() => {
 					localStorage.removeItem('isAdminAuthenticated');
 					goto('/');
 				}}
-				class="flex-shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 hover:text-red-500"
+				class="flex-shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 hover:text-red-500 sm:px-4 sm:py-2 sm:text-sm"
 			>
 				Logout
 			</button>
@@ -369,7 +434,9 @@
 
 			{#if loading}
 				<div class="flex justify-center py-20">
-					<div class="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+					<div
+						class="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"
+					></div>
 				</div>
 			{:else}
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -416,13 +483,16 @@
 								<div class="mb-2 flex items-start justify-between">
 									<div>
 										<p class="text-xs font-medium text-slate-400">{product.product_code}</p>
-										<h3 class="line-clamp-1 text-lg font-bold text-slate-800" title={product.product_name}>
+										<h3
+											class="line-clamp-1 text-lg font-bold text-slate-800"
+											title={product.product_name}
+										>
 											{product.product_name}
 										</h3>
 									</div>
 								</div>
-								
-								<p class="mb-4 text-sm text-slate-500 line-clamp-2 min-h-[2.5em]">
+
+								<p class="mb-4 line-clamp-2 min-h-[2.5em] text-sm text-slate-500">
 									{product.description || 'No description available'}
 								</p>
 
@@ -433,7 +503,9 @@
 									</div>
 									<div class="text-right">
 										<p class="text-[10px] uppercase tracking-wider text-slate-400">Stock</p>
-										<p class="font-bold text-indigo-600">{product.remaining_qty} / {product.total_preorder_qty}</p>
+										<p class="font-bold text-indigo-600">
+											{product.remaining_qty} / {product.total_preorder_qty}
+										</p>
 									</div>
 								</div>
 
@@ -446,7 +518,7 @@
 									</button>
 									<button
 										onclick={() => deleteProduct(product.id)}
-										class="flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:border-red-100 hover:text-red-600"
+										class="flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-red-100 hover:bg-red-50 hover:text-red-600"
 									>
 										Delete
 									</button>
@@ -459,181 +531,237 @@
 		{:else}
 			<!-- Preorders Tab -->
 			<div class="space-y-4">
-				<!-- Desktop View (Table) -->
-				<div class="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-					<div class="overflow-x-auto">
-						<table class="w-full text-left text-sm text-slate-600">
-							<thead class="bg-slate-50 text-xs uppercase text-slate-500">
-								<tr>
-									<th class="px-6 py-4 font-semibold">Order Date</th>
-									<th class="px-6 py-4 font-semibold">User</th>
-									<th class="px-6 py-4 font-semibold">Product</th>
-									<th class="px-6 py-4 font-semibold text-center">Qty</th>
-									<th class="px-6 py-4 font-semibold text-right">Total</th>
-									<th class="px-6 py-4 font-semibold text-center">Status</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-slate-100">
-								{#each preorderLogs as log}
-									<tr class="hover:bg-slate-50">
-										<td class="whitespace-nowrap px-6 py-4 text-slate-500">
-											{new Date(log.created_at).toLocaleDateString('th-TH', {
+				<!-- Desktop View (Cards) -->
+				<div class="hidden space-y-4 md:block">
+					{#each groupedOrders() as order (order.order_group_id)}
+						<div
+							class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
+							transition:fade
+						>
+							<!-- Order Header -->
+							<div
+								class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4"
+							>
+								<div class="flex items-center gap-4">
+									<div>
+										<p class="text-xs font-medium text-slate-400">
+											{new Date(order.created_at).toLocaleDateString('th-TH', {
 												year: 'numeric',
 												month: 'short',
 												day: 'numeric',
 												hour: '2-digit',
 												minute: '2-digit'
 											})}
-										</td>
-										<td class="px-6 py-4">
-											<div class="font-medium text-slate-900">{log.user_display_name || 'Unknown'}</div>
-											<div class="text-xs text-slate-400">{log.user_line_id}</div>
-										</td>
-										<td class="px-6 py-4">
-											<div class="font-medium text-slate-900">{log.product_code}</div>
-											<div class="truncate max-w-[200px] text-xs text-slate-500">{log.product_name}</div>
-										</td>
-										<td class="px-6 py-4 text-center font-medium">{log.quantity}</td>
-										<td class="px-6 py-4 text-right font-medium text-slate-900">฿{log.total_price.toLocaleString()}</td>
-										<td class="px-6 py-4 text-center">
-											<div class="relative inline-block text-left">
-												<button
-													onclick={(e) => {
-														e.stopPropagation();
-														toggleDropdown(log.id);
-													}}
-													class="inline-flex w-32 items-center justify-between rounded-full px-4 py-1.5 text-xs font-bold shadow-sm ring-1 ring-inset transition-all
-													{log.status === 'complete' || log.status === 'completed'
-														? 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100'
-														: log.status === 'fail' || log.status === 'cancelled'
-															? 'bg-rose-50 text-rose-700 ring-rose-200 hover:bg-rose-100'
-															: 'bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100'}"
-												>
-													<span class="capitalize">{log.status}</span>
-													<svg class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-													</svg>
-												</button>
-
-												{#if openDropdownId === log.id}
-													<div 
-														transition:fade={{ duration: 100 }}
-														class="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200 focus:outline-none"
-													>
-														<div class="space-y-1">
-															<button
-																onclick={() => updateOrderStatus(log.id, 'pending')}
-																class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors"
-															>
-																<div class="h-2 w-2 rounded-full bg-amber-400"></div>
-																Pending
-															</button>
-															<button
-																onclick={() => updateOrderStatus(log.id, 'complete')}
-																class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
-															>
-																<div class="h-2 w-2 rounded-full bg-emerald-400"></div>
-																Complete
-															</button>
-															<button
-																onclick={() => updateOrderStatus(log.id, 'fail')}
-																class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors"
-															>
-																<div class="h-2 w-2 rounded-full bg-rose-400"></div>
-																Fail
-															</button>
-														</div>
-													</div>
-												{/if}
-											</div>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
-
-				<!-- Mobile View (Card List) -->
-				<div class="md:hidden space-y-3">
-					{#each preorderLogs as log}
-						<div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-							<div class="mb-3 flex items-start justify-between">
-								<div>
-									<p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-										{new Date(log.created_at).toLocaleDateString('th-TH', {
-											day: 'numeric',
-											month: 'short',
-											year: '2-digit',
-											hour: '2-digit',
-											minute: '2-digit'
-										})}
-									</p>
-									<h4 class="font-bold text-slate-900">{log.user_display_name || 'Unknown'}</h4>
-									<p class="text-[10px] text-slate-400 font-mono">{log.user_line_id}</p>
+										</p>
+										<h4 class="font-bold text-slate-900">{order.user_display_name || 'Unknown'}</h4>
+										<p class="font-mono text-[10px] text-slate-400">{order.user_line_id}</p>
+									</div>
 								</div>
-								
-								<div class="relative text-right">
-									<button
-										onclick={(e) => {
-											e.stopPropagation();
-											toggleDropdown(log.id);
-										}}
-										class="inline-flex w-28 items-center justify-between rounded-full px-3 py-1 text-[10px] font-bold shadow-sm ring-1 ring-inset transition-all
-										{log.status === 'complete' || log.status === 'completed'
-											? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-											: log.status === 'fail' || log.status === 'cancelled'
-												? 'bg-rose-50 text-rose-700 ring-rose-200'
-												: 'bg-amber-50 text-amber-700 ring-amber-200'}"
-									>
-										<span class="capitalize">{log.status}</span>
-										<svg class="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-										</svg>
-									</button>
 
-									{#if openDropdownId === log.id}
-										<div 
-											transition:fade={{ duration: 100 }}
-											class="absolute right-0 z-50 mt-1 w-32 origin-top-right rounded-xl bg-white p-1 shadow-xl ring-1 ring-slate-200"
+								<div class="flex items-center gap-4">
+									<!-- Summary -->
+									<div class="text-right">
+										<p class="text-xs text-slate-400">{order.total_items} ชิ้น</p>
+										<p class="text-lg font-bold text-indigo-600">
+											฿{order.total_price.toLocaleString()}
+										</p>
+									</div>
+
+									<!-- Status Dropdown -->
+									<div class="relative">
+										<button
+											onclick={(e) => {
+												e.stopPropagation();
+												toggleDropdown(order.order_group_id);
+											}}
+											class="inline-flex w-32 items-center justify-between rounded-full px-4 py-1.5 text-xs font-bold shadow-sm ring-1 ring-inset transition-all
+											{order.status === 'complete' || order.status === 'completed'
+												? 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100'
+												: order.status === 'fail' || order.status === 'cancelled'
+													? 'bg-rose-50 text-rose-700 ring-rose-200 hover:bg-rose-100'
+													: 'bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100'}"
 										>
-											<div class="space-y-0.5">
-												<button
-													onclick={() => updateOrderStatus(log.id, 'pending')}
-													class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-amber-700 hover:bg-amber-50"
-												>
-													<div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
-													Pending
-												</button>
-												<button
-													onclick={() => updateOrderStatus(log.id, 'complete')}
-													class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-emerald-700 hover:bg-emerald-50"
-												>
-													<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
-													Complete
-												</button>
-												<button
-													onclick={() => updateOrderStatus(log.id, 'fail')}
-													class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-rose-700 hover:bg-rose-50"
-												>
-													<div class="h-1.5 w-1.5 rounded-full bg-rose-400"></div>
-													Fail
-												</button>
+											<span class="capitalize">{order.status}</span>
+											<svg
+												class="h-4 w-4 opacity-50"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M19 9l-7 7-7-7"
+												/>
+											</svg>
+										</button>
+
+										{#if openDropdownId === order.order_group_id}
+											<div
+												transition:fade={{ duration: 100 }}
+												class="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200 focus:outline-none"
+											>
+												<div class="space-y-1">
+													<button
+														onclick={() => updateGroupStatus(order.order_group_id, 'pending')}
+														class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+													>
+														<div class="h-2 w-2 rounded-full bg-amber-400"></div>
+														Pending
+													</button>
+													<button
+														onclick={() => updateGroupStatus(order.order_group_id, 'complete')}
+														class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+													>
+														<div class="h-2 w-2 rounded-full bg-emerald-400"></div>
+														Complete
+													</button>
+													<button
+														onclick={() => updateGroupStatus(order.order_group_id, 'fail')}
+														class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+													>
+														<div class="h-2 w-2 rounded-full bg-rose-400"></div>
+														Fail
+													</button>
+												</div>
 											</div>
-										</div>
-									{/if}
+										{/if}
+									</div>
 								</div>
 							</div>
 
-							<div class="flex items-center justify-between rounded-xl bg-slate-50 p-2.5">
-								<div class="flex-1">
-									<p class="text-[10px] font-bold text-indigo-600">{log.product_code}</p>
-									<p class="truncate text-xs font-medium text-slate-700 max-w-[150px]">{log.product_name}</p>
+							<!-- Order Items -->
+							<div class="divide-y divide-slate-100">
+								{#each order.items as item}
+									<div class="flex items-center justify-between px-6 py-3">
+										<div>
+											<span class="font-medium text-indigo-600">{item.product_code}</span>
+											<span class="ml-2 text-slate-700">{item.product_name}</span>
+										</div>
+										<div class="flex items-center gap-6">
+											<span class="text-sm text-slate-500">x{item.quantity}</span>
+											<span class="font-medium text-slate-900"
+												>฿{item.total_price.toLocaleString()}</span
+											>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<!-- Mobile View (Card List) -->
+				<div class="space-y-3 md:hidden">
+					{#each groupedOrders() as order (order.order_group_id)}
+						<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+							<!-- Order Header -->
+							<div class="border-b border-slate-100 p-4">
+								<div class="mb-3 flex items-start justify-between">
+									<div>
+										<p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+											{new Date(order.created_at).toLocaleDateString('th-TH', {
+												day: 'numeric',
+												month: 'short',
+												year: '2-digit',
+												hour: '2-digit',
+												minute: '2-digit'
+											})}
+										</p>
+										<h4 class="font-bold text-slate-900">{order.user_display_name || 'Unknown'}</h4>
+										<p class="font-mono text-[10px] text-slate-400">{order.user_line_id}</p>
+									</div>
+
+									<div class="relative text-right">
+										<button
+											onclick={(e) => {
+												e.stopPropagation();
+												toggleDropdown(order.order_group_id);
+											}}
+											class="inline-flex w-28 items-center justify-between rounded-full px-3 py-1 text-[10px] font-bold shadow-sm ring-1 ring-inset transition-all
+											{order.status === 'complete' || order.status === 'completed'
+												? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+												: order.status === 'fail' || order.status === 'cancelled'
+													? 'bg-rose-50 text-rose-700 ring-rose-200'
+													: 'bg-amber-50 text-amber-700 ring-amber-200'}"
+										>
+											<span class="capitalize">{order.status}</span>
+											<svg
+												class="h-3 w-3 opacity-50"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M19 9l-7 7-7-7"
+												/>
+											</svg>
+										</button>
+
+										{#if openDropdownId === order.order_group_id}
+											<div
+												transition:fade={{ duration: 100 }}
+												class="absolute right-0 z-50 mt-1 w-32 origin-top-right rounded-xl bg-white p-1 shadow-xl ring-1 ring-slate-200"
+											>
+												<div class="space-y-0.5">
+													<button
+														onclick={() => updateGroupStatus(order.order_group_id, 'pending')}
+														class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-amber-700 hover:bg-amber-50"
+													>
+														<div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
+														Pending
+													</button>
+													<button
+														onclick={() => updateGroupStatus(order.order_group_id, 'complete')}
+														class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-emerald-700 hover:bg-emerald-50"
+													>
+														<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
+														Complete
+													</button>
+													<button
+														onclick={() => updateGroupStatus(order.order_group_id, 'fail')}
+														class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-rose-700 hover:bg-rose-50"
+													>
+														<div class="h-1.5 w-1.5 rounded-full bg-rose-400"></div>
+														Fail
+													</button>
+												</div>
+											</div>
+										{/if}
+									</div>
 								</div>
-								<div class="text-right">
-									<p class="text-[10px] text-slate-400">Qty: {log.quantity}</p>
-									<p class="font-bold text-slate-900">฿{log.total_price.toLocaleString()}</p>
-								</div>
+							</div>
+
+							<!-- Order Items -->
+							<div class="divide-y divide-slate-100 bg-slate-50/50">
+								{#each order.items as item}
+									<div class="flex items-center justify-between px-4 py-2.5">
+										<div class="min-w-0 flex-1">
+											<p class="text-[10px] font-bold text-indigo-600">{item.product_code}</p>
+											<p class="truncate text-xs font-medium text-slate-700">{item.product_name}</p>
+										</div>
+										<div class="ml-3 flex-shrink-0 text-right">
+											<p class="text-[10px] text-slate-400">x{item.quantity}</p>
+											<p class="text-sm font-bold text-slate-900">
+												฿{item.total_price.toLocaleString()}
+											</p>
+										</div>
+									</div>
+								{/each}
+							</div>
+
+							<!-- Order Total -->
+							<div
+								class="flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3"
+							>
+								<span class="text-sm font-medium text-slate-600">รวม {order.total_items} ชิ้น</span>
+								<span class="text-lg font-bold text-indigo-600"
+									>฿{order.total_price.toLocaleString()}</span
+								>
 							</div>
 						</div>
 					{/each}
@@ -650,24 +778,38 @@
 		role="dialog"
 		aria-modal="true"
 	>
-		<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick={() => (showModal = false)} transition:fade></div>
+		<div
+			class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+			onclick={() => (showModal = false)}
+			transition:fade
+		></div>
 		<div class="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl" transition:slide>
 			<div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
 				<h2 class="text-lg font-bold text-slate-800">
 					{modalMode === 'add' ? 'Add New Product' : 'Edit Product'}
 				</h2>
-				<button onclick={() => (showModal = false)} class="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+				<button
+					onclick={() => (showModal = false)}
+					class="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+				>
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
 					</svg>
 				</button>
 			</div>
-			
+
 			<div class="p-6">
 				<div class="grid gap-4">
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="product_code" class="mb-1 block text-sm font-medium text-slate-700">Code</label>
+							<label for="product_code" class="mb-1 block text-sm font-medium text-slate-700"
+								>Code</label
+							>
 							<input
 								id="product_code"
 								type="text"
@@ -688,7 +830,9 @@
 					</div>
 
 					<div>
-						<label for="product_name" class="mb-1 block text-sm font-medium text-slate-700">Product Name</label>
+						<label for="product_name" class="mb-1 block text-sm font-medium text-slate-700"
+							>Product Name</label
+						>
 						<input
 							id="product_name"
 							type="text"
@@ -700,7 +844,9 @@
 
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="total_qty" class="mb-1 block text-sm font-medium text-slate-700">Total Qty</label>
+							<label for="total_qty" class="mb-1 block text-sm font-medium text-slate-700"
+								>Total Qty</label
+							>
 							<input
 								id="total_qty"
 								type="number"
@@ -709,7 +855,9 @@
 							/>
 						</div>
 						<div>
-							<label for="remaining_qty" class="mb-1 block text-sm font-medium text-slate-700">Remaining</label>
+							<label for="remaining_qty" class="mb-1 block text-sm font-medium text-slate-700"
+								>Remaining</label
+							>
 							<input
 								id="remaining_qty"
 								type="number"
@@ -719,46 +867,80 @@
 						</div>
 					</div>
 
-						<div>
-							<label for="image_file" class="mb-1 block text-sm font-medium text-slate-700">Product Image</label>
-							<div class="flex items-center gap-4">
-								<div class="relative flex-1">
-									<input
-										id="image_file"
-										type="file"
-										accept="image/*"
-										onchange={handleFileChange}
-										class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-									/>
-									<div class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-										<span class="truncate">{selectedFile ? selectedFile.name : (formData.image_url ? 'Change Image...' : 'Click to upload image...')}</span>
-										<svg class="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-										</svg>
-									</div>
+					<div>
+						<label for="image_file" class="mb-1 block text-sm font-medium text-slate-700"
+							>Product Image</label
+						>
+						<div class="flex items-center gap-4">
+							<div class="relative flex-1">
+								<input
+									id="image_file"
+									type="file"
+									accept="image/*"
+									onchange={handleFileChange}
+									class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+								/>
+								<div
+									class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500"
+								>
+									<span class="truncate"
+										>{selectedFile
+											? selectedFile.name
+											: formData.image_url
+												? 'Change Image...'
+												: 'Click to upload image...'}</span
+									>
+									<svg
+										class="h-5 w-5 text-indigo-500"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+										/>
+									</svg>
 								</div>
-								{#if formData.image_url && !selectedFile}
-									<div class="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-										<img src={formData.image_url} alt="Preview" class="h-full w-full object-cover" />
-									</div>
-								{/if}
 							</div>
-							<p class="mt-1 text-[10px] text-slate-400">Max size 1MB. Auto-resized for performance.</p>
+							{#if formData.image_url && !selectedFile}
+								<div
+									class="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200"
+								>
+									<img src={formData.image_url} alt="Preview" class="h-full w-full object-cover" />
+								</div>
+							{/if}
 						</div>
+						<p class="mt-1 text-[10px] text-slate-400">
+							Max size 1MB. Auto-resized for performance.
+						</p>
+					</div>
 
-						<div class="flex items-center gap-3 py-2">
-							<button 
-								type="button"
-								onclick={() => formData.is_active = !formData.is_active}
-								class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ring-2 ring-indigo-500 ring-offset-2 {formData.is_active ? 'bg-indigo-600' : 'bg-slate-200'}"
-							>
-								<span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {formData.is_active ? 'translate-x-6' : 'translate-x-1'}"></span>
-							</button>
-							<span class="text-sm font-medium text-slate-700">Product Status: {formData.is_active ? 'Active' : 'Inactive'}</span>
-						</div>
+					<div class="flex items-center gap-3 py-2">
+						<button
+							type="button"
+							onclick={() => (formData.is_active = !formData.is_active)}
+							class="relative inline-flex h-6 w-11 items-center rounded-full ring-2 ring-indigo-500 ring-offset-2 transition-colors focus:outline-none {formData.is_active
+								? 'bg-indigo-600'
+								: 'bg-slate-200'}"
+						>
+							<span
+								class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {formData.is_active
+									? 'translate-x-6'
+									: 'translate-x-1'}"
+							></span>
+						</button>
+						<span class="text-sm font-medium text-slate-700"
+							>Product Status: {formData.is_active ? 'Active' : 'Inactive'}</span
+						>
+					</div>
 
 					<div>
-						<label for="description" class="mb-1 block text-sm font-medium text-slate-700">Description</label>
+						<label for="description" class="mb-1 block text-sm font-medium text-slate-700"
+							>Description</label
+						>
 						<textarea
 							id="description"
 							rows="3"
@@ -771,12 +953,23 @@
 				<button
 					onclick={handleSubmit}
 					disabled={uploading}
-					class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-medium text-white shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+					class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-medium text-white shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:bg-indigo-400"
 				>
 					{#if uploading}
 						<svg class="h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
 						</svg>
 						Saving...
 					{:else}
