@@ -51,6 +51,7 @@
 	let loading = $state(true);
 	let searchTerm = $state('');
 	let openDropdownId = $state<string | null>(null);
+	let selectedItems = $state<Set<string>>(new Set());
 
 	// Modal State
 	let showModal = $state(false);
@@ -152,6 +153,69 @@
 				log.order_group_id === orderGroupId ? { ...log, payment_status: newPaidStatus } : log
 			);
 		}
+	}
+
+	function toggleItemSelection(id: string) {
+		if (selectedItems.has(id)) {
+			selectedItems.delete(id);
+		} else {
+			selectedItems.add(id);
+		}
+		selectedItems = new Set(selectedItems); // Trigger reactivity
+	}
+
+	async function handleBulkArrived() {
+		if (selectedItems.size === 0) return;
+		if (
+			!confirm(
+				`Are you sure you want to mark ${selectedItems.size} items as ARRIVED and notify customers?`
+			)
+		)
+			return;
+
+		loading = true;
+		const selectedArray = Array.from(selectedItems);
+
+		// 1. Update status to 'complete' in Supabase
+		const { error } = await supabase
+			.from('preorder_logs')
+			.update({ status: 'complete' })
+			.in('id', selectedArray);
+
+		if (error) {
+			alert('Error updating items: ' + error.message);
+		} else {
+			// 2. Identify unique users to notify
+			const usersToNotify = new Map<string, PreorderLog[]>();
+			preorderLogs.forEach((log) => {
+				if (selectedItems.has(log.id)) {
+					const userItems = usersToNotify.get(log.user_line_id) || [];
+					userItems.push(log);
+					usersToNotify.set(log.user_line_id, userItems);
+				}
+			});
+
+			// 3. Send notifications via BOT API
+			for (const [userId, items] of usersToNotify.entries()) {
+				try {
+					await fetch('http://localhost:3000/api/notify-arrived', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ userLineId: userId, items })
+					});
+				} catch (e) {
+					console.error('Failed to notify user:', userId, e);
+				}
+			}
+
+			// 4. Update local state
+			preorderLogs = preorderLogs.map((log) =>
+				selectedItems.has(log.id) ? { ...log, status: 'complete' } : log
+			);
+			selectedItems = new Set();
+			alert('Successfully updated and notified customers! 🎉');
+		}
+		loading = false;
 	}
 
 	async function deleteProduct(id: string) {
@@ -613,9 +677,19 @@
 											? 'z-20'
 											: 'z-auto'}"
 									>
-										<div class="flex-1">
-											<span class="font-bold text-indigo-600">{item.product_code}</span>
-											<span class="ml-2 font-medium text-slate-700">{item.product_name}</span>
+										<div class="flex flex-1 items-center gap-4">
+											<!-- Checkbox -->
+											<input
+												type="checkbox"
+												checked={selectedItems.has(item.id)}
+												onchange={() => toggleItemSelection(item.id)}
+												disabled={item.status === 'complete'}
+												class="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+											/>
+											<div class="flex-1">
+												<span class="font-bold text-indigo-600">{item.product_code}</span>
+												<span class="ml-2 font-medium text-slate-700">{item.product_name}</span>
+											</div>
 										</div>
 										<div class="flex items-center gap-4">
 											<span class="text-sm font-medium text-slate-400">x{item.quantity}</span>
@@ -740,7 +814,17 @@
 											? 'z-20'
 											: 'z-auto'}"
 									>
-										<div class="mb-2 flex items-start justify-between">
+										<div class="mb-2 flex items-start gap-3">
+											<!-- Checkbox Mobile -->
+											<div class="pt-1">
+												<input
+													type="checkbox"
+													checked={selectedItems.has(item.id)}
+													onchange={() => toggleItemSelection(item.id)}
+													disabled={item.status === 'complete'}
+													class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+												/>
+											</div>
 											<div class="min-w-0 flex-1">
 												<p class="text-[10px] font-bold text-indigo-600">{item.product_code}</p>
 												<p class="truncate text-xs font-medium text-slate-700">
@@ -1069,6 +1153,48 @@
 					{/if}
 				</button>
 			</div>
+		</div>
+	</div>
+{/if}
+
+{#if selectedItems.size > 0}
+	<div
+		transition:slide={{ axis: 'y' }}
+		class="fixed bottom-24 left-1/2 z-[100] w-[90%] -translate-x-1/2 md:bottom-10 md:w-auto"
+	>
+		<div
+			class="flex items-center gap-4 rounded-2xl bg-slate-900/90 px-6 py-4 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl"
+		>
+			<div class="hidden border-r border-white/10 pr-4 md:block">
+				<p class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Selected</p>
+				<p class="text-xl font-black text-white">
+					{selectedItems.size} <span class="text-xs font-normal opacity-60">items</span>
+				</p>
+			</div>
+			<div class="md:hidden">
+				<p class="text-xs font-bold text-white">{selectedItems.size} ชิ้น</p>
+			</div>
+			<button
+				onclick={handleBulkArrived}
+				disabled={loading}
+				class="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-6 py-3 font-bold text-white shadow-lg transition-transform active:scale-95 disabled:grayscale"
+			>
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+					/>
+				</svg>
+				Mark Arrived & Notify
+			</button>
+			<button
+				onclick={() => (selectedItems = new Set())}
+				class="ml-2 text-xs font-medium text-white/60 hover:text-white"
+			>
+				Cancel
+			</button>
 		</div>
 	</div>
 {/if}
