@@ -310,7 +310,7 @@
 	);
 
 	// จัดกลุ่มออเดอร์ตาม order_group_id
-	let groupedOrders = $derived(() => {
+	let groupedOrders = $derived.by(() => {
 		const groups = new Map<string, GroupedOrder>();
 
 		for (const log of preorderLogs) {
@@ -533,7 +533,7 @@
 			<div class="space-y-4">
 				<!-- Desktop View (Cards) -->
 				<div class="hidden space-y-4 md:block">
-					{#each groupedOrders() as order (order.order_group_id)}
+					{#each groupedOrders as order (order.order_group_id)}
 						<div
 							class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
 							transition:fade
@@ -654,7 +654,7 @@
 
 				<!-- Mobile View (Card List) -->
 				<div class="space-y-3 md:hidden">
-					{#each groupedOrders() as order (order.order_group_id)}
+					{#each groupedOrders as order (order.order_group_id)}
 						<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 							<!-- Order Header -->
 							<div class="border-b border-slate-100 p-4">
