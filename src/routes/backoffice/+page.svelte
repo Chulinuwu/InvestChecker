@@ -778,11 +778,13 @@
 		role="dialog"
 		aria-modal="true"
 	>
-		<div
-			class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+		<button
+			type="button"
+			class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
 			onclick={() => (showModal = false)}
+			aria-label="Close modal overlay"
 			transition:fade
-		></div>
+		></button>
 		<div class="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl" transition:slide>
 			<div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
 				<h2 class="text-lg font-bold text-slate-800">
@@ -791,6 +793,7 @@
 				<button
 					onclick={() => (showModal = false)}
 					class="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+					aria-label="Close modal"
 				>
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
@@ -922,6 +925,7 @@
 						<button
 							type="button"
 							onclick={() => (formData.is_active = !formData.is_active)}
+							aria-label="Toggle product active status"
 							class="relative inline-flex h-6 w-11 items-center rounded-full ring-2 ring-indigo-500 ring-offset-2 transition-colors focus:outline-none {formData.is_active
 								? 'bg-indigo-600'
 								: 'bg-slate-200'}"

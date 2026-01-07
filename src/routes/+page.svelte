@@ -1,2182 +1,2652 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { goto } from '$app/navigation'
-  import { investmentService, investmentLogService } from '$lib/supabase'
-  
-  // Login state
-  let isAuthenticated = false
-  let loginUsername = ''
-  let loginPassword = ''
-  let loginError = ''
-  
-  let investments: any[] = []
-  let loading = true
-  let error: string | null = null
-  let showAddForm = false
-  let editingInvestment: any = null
-  let showEditModal = false
-  let editModalInvestment: any = null
-  let showCharts = false
-  let showReceivedModal = false
-  let modalInvestment: any = null
-  let receivedAmount = ''
-  
-  // Transaction History state
-  let showTransactionHistory = false
-  let transactionLogs: any[] = []
-  let transactionLoading = false
-  let selectedInvestmentForLogs: number | null = null
-  let transactionViewMode: 'card' | 'table' = 'card' // 'card' หรือ 'table'
-  
-  // Filter state
-  let filterStatus = 'all'
-  let searchQuery = ''
-  
-  // Form data
-  let formData = {
-    amount: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: '',
-    expected_return: '',
-    current_received: '',
-    status: 'active',
-    notes: '',
-    product_type: '',
-    supplier: '',
-    customer: '',
-    profit_margin: ''
-  }
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { investmentService, investmentLogService } from '$lib/supabase';
 
-  onMount(async () => {
-    // Check if already logged in (from localStorage)
-    const savedAuth = localStorage.getItem('isAuthenticated')
-    const savedAdminAuth = localStorage.getItem('isAdminAuthenticated')
+	// Login state
+	let isAuthenticated = false;
+	let loginUsername = '';
+	let loginPassword = '';
+	let loginError = '';
 
-    if (savedAdminAuth === 'true') {
-      goto('/backoffice')
-      return
-    }
+	let investments: any[] = [];
+	let loading = true;
+	let error: string | null = null;
+	let showAddForm = false;
+	let editingInvestment: any = null;
+	let showEditModal = false;
+	let editModalInvestment: any = null;
+	let showCharts = false;
+	let showReceivedModal = false;
+	let modalInvestment: any = null;
+	let receivedAmount = '';
 
-    if (savedAuth === 'true') {
-      isAuthenticated = true
-      await loadInvestments()
-    } else {
-      loading = false
-    }
-  })
+	// Transaction History state
+	let showTransactionHistory = false;
+	let transactionLogs: any[] = [];
+	let transactionLoading = false;
+	let selectedInvestmentForLogs: number | null = null;
+	let transactionViewMode: 'card' | 'table' = 'card'; // 'card' หรือ 'table'
 
-  function handleLogin() {
-    const validUsername = import.meta.env.VITE_LOGIN_USERNAME
-    const validPassword = import.meta.env.VITE_LOGIN_PASSWORD
-    
-    // Admin / Backoffice User
-    const adminUsername = import.meta.env.VITE_LOGIN_USERNAME_2
-    const adminPassword = import.meta.env.VITE_LOGIN_PASSWORD_2
+	// Filter state
+	let filterStatus = 'all';
+	let searchQuery = '';
 
-    if (loginUsername === adminUsername && loginPassword === adminPassword) {
-      localStorage.setItem('isAdminAuthenticated', 'true')
-      goto('/backoffice')
-      return;
-    }
+	// Form data
+	let formData = {
+		amount: '',
+		start_date: new Date().toISOString().split('T')[0],
+		end_date: '',
+		expected_return: '',
+		current_received: '',
+		status: 'active',
+		notes: '',
+		product_type: '',
+		supplier: '',
+		customer: '',
+		profit_margin: ''
+	};
 
-    if (loginUsername === validUsername && loginPassword === validPassword) {
-      isAuthenticated = true
-      localStorage.setItem('isAuthenticated', 'true')
-      loginError = ''
-      loadInvestments()
-    } else {
-      loginError = 'ชื่อผู้ใช้หรือ rหัสผ่านไม่ถูกต้อง'
-    }
-  }
+	onMount(async () => {
+		// Check if already logged in (from localStorage)
+		const savedAuth = localStorage.getItem('isAuthenticated');
+		const savedAdminAuth = localStorage.getItem('isAdminAuthenticated');
 
-  function handleLogout() {
-    isAuthenticated = false
-    localStorage.removeItem('isAuthenticated')
-    loginUsername = ''
-    loginPassword = ''
-    loginError = ''
-    investments = []
-    showAddForm = false
-    showEditModal = false
-    showCharts = false
-    showReceivedModal = false
-  }
+		if (savedAdminAuth === 'true') {
+			goto('/backoffice');
+			return;
+		}
 
-  async function loadInvestments() {
-    try {
-      loading = true
-      investments = await investmentService.getInvestments()
-      console.log('Loaded investments:', investments) // Debug log
-      loading = false
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred'
-      console.error('Error loading investments:', err) // Debug log
-      loading = false
-    }
-  }
+		if (savedAuth === 'true') {
+			isAuthenticated = true;
+			await loadInvestments();
+		} else {
+			loading = false;
+		}
+	});
 
-  async function addInvestment() {
-    try {
-      if (!formData.amount || !formData.start_date) {
-        error = 'กรุณากรอกจำนวนเงินและวันที่เริ่มต้น'
-        return
-      }
+	function handleLogin() {
+		const validUsername = import.meta.env.VITE_LOGIN_USERNAME;
+		const validPassword = import.meta.env.VITE_LOGIN_PASSWORD;
 
-      const newInvestment = {
-        amount: parseFloat(formData.amount),
-        start_date: formData.start_date,
-        end_date: formData.end_date || null,
-        expected_return: formData.expected_return ? parseFloat(formData.expected_return) : null,
-        current_received: formData.current_received ? parseFloat(formData.current_received) : 0,
-        status: formData.status,
-        notes: formData.notes,
-        product_type: formData.product_type,
-        supplier: formData.supplier,
-        customer: formData.customer,
-        profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null
-      }
-      
-      const result = await investmentService.addInvestment(newInvestment)
-      investments = [result, ...investments]
-      
-      // บันทึก log การสร้าง investment ใหม่ (เงินออก)
-      await investmentLogService.logInitialInvestment(
-        result.id,
-        parseFloat(formData.amount),
-        `สร้างการลงทุนใหม่: ${formData.product_type || 'ไม่ระบุประเภท'}`
-      )
-      
-      resetForm()
-      showAddForm = false
-      error = null
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred'
-    }
-  }
+		// Admin / Backoffice User
+		const adminUsername = import.meta.env.VITE_LOGIN_USERNAME_2;
+		const adminPassword = import.meta.env.VITE_LOGIN_PASSWORD_2;
 
-  async function updateInvestment() {
-    try {
-      if (!formData.amount || !formData.start_date) {
-        error = 'กรุณากรอกจำนวนเงินและวันที่เริ่มต้น'
-        return
-      }
+		if (loginUsername === adminUsername && loginPassword === adminPassword) {
+			localStorage.setItem('isAdminAuthenticated', 'true');
+			goto('/backoffice');
+			return;
+		}
 
-      if (!editingInvestment) {
-        error = 'ไม่พบข้อมูลการลงทุนที่จะแก้ไข'
-        return
-      }
+		if (loginUsername === validUsername && loginPassword === validPassword) {
+			isAuthenticated = true;
+			localStorage.setItem('isAuthenticated', 'true');
+			loginError = '';
+			loadInvestments();
+		} else {
+			loginError = 'ชื่อผู้ใช้หรือ rหัสผ่านไม่ถูกต้อง';
+		}
+	}
 
-      const updates = {
-        amount: parseFloat(formData.amount),
-        start_date: formData.start_date,
-        end_date: formData.end_date || null,
-        expected_return: formData.expected_return ? parseFloat(formData.expected_return) : null,
-        current_received: formData.current_received ? parseFloat(formData.current_received) : 0,
-        status: formData.status,
-        notes: formData.notes,
-        product_type: formData.product_type,
-        supplier: formData.supplier,
-        customer: formData.customer,
-        profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null
-      }
-      
-      await investmentService.updateInvestment(editingInvestment.id, updates)
-      await loadInvestments()
-      
-      resetForm()
-      showEditModal = false
-      editingInvestment = null
-      editModalInvestment = null
-      error = null
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred'
-    }
-  }
+	function handleLogout() {
+		isAuthenticated = false;
+		localStorage.removeItem('isAuthenticated');
+		loginUsername = '';
+		loginPassword = '';
+		loginError = '';
+		investments = [];
+		showAddForm = false;
+		showEditModal = false;
+		showCharts = false;
+		showReceivedModal = false;
+	}
 
-  function startEdit(investment: any) {
-    editModalInvestment = investment
-    editingInvestment = investment
-    formData = {
-      amount: investment.amount.toString(),
-      start_date: investment.start_date,
-      end_date: investment.end_date || '',
-      expected_return: investment.expected_return ? investment.expected_return.toString() : '',
-      current_received: investment.current_received ? investment.current_received.toString() : '0',
-      status: investment.status,
-      notes: investment.notes || '',
-      product_type: investment.product_type || '',
-      supplier: investment.supplier || '',
-      customer: investment.customer || '',
-      profit_margin: investment.profit_margin ? investment.profit_margin.toString() : ''
-    }
-    showEditModal = true
-    showAddForm = false
-  }
+	async function loadInvestments() {
+		try {
+			loading = true;
+			investments = await investmentService.getInvestments();
+			console.log('Loaded investments:', investments); // Debug log
+			loading = false;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+			console.error('Error loading investments:', err); // Debug log
+			loading = false;
+		}
+	}
 
-  function closeEditModal() {
-    showEditModal = false
-    editModalInvestment = null
-    editingInvestment = null
-    resetForm()
-  }
+	async function addInvestment() {
+		try {
+			if (!formData.amount || !formData.start_date) {
+				error = 'กรุณากรอกจำนวนเงินและวันที่เริ่มต้น';
+				return;
+			}
 
-  function cancelEdit() {
-    closeEditModal()
-  }
+			const newInvestment = {
+				amount: parseFloat(formData.amount),
+				start_date: formData.start_date,
+				end_date: formData.end_date || null,
+				expected_return: formData.expected_return ? parseFloat(formData.expected_return) : null,
+				current_received: formData.current_received ? parseFloat(formData.current_received) : 0,
+				status: formData.status,
+				notes: formData.notes,
+				product_type: formData.product_type,
+				supplier: formData.supplier,
+				customer: formData.customer,
+				profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null
+			};
 
-  function resetForm() {
-    formData = {
-      amount: '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: '',
-      expected_return: '',
-      current_received: '',
-      status: 'active',
-      notes: '',
-      product_type: '',
-      supplier: '',
-      customer: '',
-      profit_margin: ''
-    }
-  }
+			const result = await investmentService.addInvestment(newInvestment);
+			investments = [result, ...investments];
 
-  async function quickUpdateReceived(investment: { current_received: any; id: any; }) {
-    modalInvestment = investment
-    receivedAmount = ''
-    showReceivedModal = true
-  }
+			// บันทึก log การสร้าง investment ใหม่ (เงินออก)
+			await investmentLogService.logInitialInvestment(
+				result.id,
+				parseFloat(formData.amount),
+				`สร้างการลงทุนใหม่: ${formData.product_type || 'ไม่ระบุประเภท'}`
+			);
 
-  async function updateReceivedAmount() {
-    if (!receivedAmount || isNaN(parseFloat(receivedAmount))) {
-      error = 'กรุณาใส่จำนวนเงินที่ถูกต้อง'
-      return
-    }
+			resetForm();
+			showAddForm = false;
+			error = null;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		}
+	}
 
-    try {
-      const balanceBefore = modalInvestment.current_received || 0
-      const amountToAdd = parseFloat(receivedAmount)
-      const totalReceived = balanceBefore + amountToAdd
-      
-      await investmentService.updateInvestment(modalInvestment.id, { 
-        current_received: totalReceived 
-      })
-      
-      // บันทึก log เงินเข้า (deposit)
-      await investmentLogService.logDeposit(
-        modalInvestment.id,
-        amountToAdd,
-        balanceBefore,
-        `รับเงินคืน: ${modalInvestment.product_type || 'การลงทุน #' + modalInvestment.id}`
-      )
-      
-      await loadInvestments()
-      closeReceivedModal()
-      error = null
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred'
-    }
-  }
+	async function updateInvestment() {
+		try {
+			if (!formData.amount || !formData.start_date) {
+				error = 'กรุณากรอกจำนวนเงินและวันที่เริ่มต้น';
+				return;
+			}
 
-  function closeReceivedModal() {
-    showReceivedModal = false
-    modalInvestment = null
-    receivedAmount = ''
-  }
+			if (!editingInvestment) {
+				error = 'ไม่พบข้อมูลการลงทุนที่จะแก้ไข';
+				return;
+			}
 
-  async function updateInvestmentStatus(id: any, status: string) {
-    try {
-      await investmentService.updateInvestment(id, { status })
-      await loadInvestments()
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred'
-    }
-  }
+			const updates = {
+				amount: parseFloat(formData.amount),
+				start_date: formData.start_date,
+				end_date: formData.end_date || null,
+				expected_return: formData.expected_return ? parseFloat(formData.expected_return) : null,
+				current_received: formData.current_received ? parseFloat(formData.current_received) : 0,
+				status: formData.status,
+				notes: formData.notes,
+				product_type: formData.product_type,
+				supplier: formData.supplier,
+				customer: formData.customer,
+				profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null
+			};
 
-  async function deleteInvestment(id: any) {
-    if (confirm('คุณแน่ใจหรือไม่ที่จะลบการลงทุนนี้?')) {
-      try {
-        await investmentService.deleteInvestment(id)
-        await loadInvestments()
-      } catch (err) {
-        error = err instanceof Error ? err.message : 'An error occurred'
-      }
-    }
-  }
+			await investmentService.updateInvestment(editingInvestment.id, updates);
+			await loadInvestments();
 
-  async function addSampleData() {
-    try {
-      const sampleInvestments = [
-        {
-          amount: 10000,
-          start_date: '2024-11-01',
-          end_date: '2024-12-01',
-          expected_return: 12000,
-          current_received: 8000,
-          status: 'active',
-          notes: 'การลงทุนตัวอย่าง 1',
-          product_type: 'เสื้อผ้า',
-          supplier: 'ซัพพลายเออร์ A',
-          customer: 'Facebook',
-          profit_margin: 20
-        },
-        {
-          amount: 15000,
-          start_date: '2024-10-15',
-          end_date: '2024-11-15',
-          expected_return: 18000,
-          current_received: 18500,
-          status: 'completed',
-          notes: 'การลงทุนตัวอย่าง 2',
-          product_type: 'อิเล็กทรอนิกส์',
-          supplier: 'ซัพพลายเออร์ B',
-          customer: 'Shopee',
-          profit_margin: 25
-        },
-        {
-          amount: 8000,
-          start_date: '2024-12-01',
-          end_date: '2025-01-01',
-          expected_return: 9500,
-          current_received: 5000,
-          status: 'active',
-          notes: 'การลงทุนตัวอย่าง 3',
-          product_type: 'ของเล่น',
-          supplier: 'ซัพพลายเออร์ C',
-          customer: 'Lazada',
-          profit_margin: 18
-        }
-      ]
+			resetForm();
+			showEditModal = false;
+			editingInvestment = null;
+			editModalInvestment = null;
+			error = null;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		}
+	}
 
-      for (const sample of sampleInvestments) {
-        await investmentService.addInvestment(sample)
-      }
-      
-      await loadInvestments()
-      error = null
-      console.log('Sample data added successfully')
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred while adding sample data'
-      console.error('Error adding sample data:', err)
-    }
-  }
+	function startEdit(investment: any) {
+		editModalInvestment = investment;
+		editingInvestment = investment;
+		formData = {
+			amount: investment.amount.toString(),
+			start_date: investment.start_date,
+			end_date: investment.end_date || '',
+			expected_return: investment.expected_return ? investment.expected_return.toString() : '',
+			current_received: investment.current_received ? investment.current_received.toString() : '0',
+			status: investment.status,
+			notes: investment.notes || '',
+			product_type: investment.product_type || '',
+			supplier: investment.supplier || '',
+			customer: investment.customer || '',
+			profit_margin: investment.profit_margin ? investment.profit_margin.toString() : ''
+		};
+		showEditModal = true;
+		showAddForm = false;
+	}
 
-  function calculateROI(investment: { current_received: number; amount: number; }) {
-    const received = investment.current_received || 0
-    if (received === 0) return null
-    const roi = ((received - investment.amount) / investment.amount) * 100
-    return roi.toFixed(2)
-  }
+	function closeEditModal() {
+		showEditModal = false;
+		editModalInvestment = null;
+		editingInvestment = null;
+		resetForm();
+	}
 
-  function calculateExpectedROI(investment: { expected_return: number; amount: number; }) {
-    if (!investment.expected_return) return null
-    const roi = ((investment.expected_return - investment.amount) / investment.amount) * 100
-    return roi.toFixed(2)
-  }
+	function cancelEdit() {
+		closeEditModal();
+	}
 
-  function calculateProgress(investment: { expected_return: number; current_received: number; }) {
-    if (!investment.expected_return || !investment.current_received) return 0
-    const progress = (investment.current_received / investment.expected_return) * 100
-    return Math.min(progress, 100).toFixed(1)
-  }
+	function resetForm() {
+		formData = {
+			amount: '',
+			start_date: new Date().toISOString().split('T')[0],
+			end_date: '',
+			expected_return: '',
+			current_received: '',
+			status: 'active',
+			notes: '',
+			product_type: '',
+			supplier: '',
+			customer: '',
+			profit_margin: ''
+		};
+	}
 
-  function calculateDaysLeft(endDate: string | number | Date) {
-    if (!endDate) return null
-    const today = new Date()
-    const end = new Date(endDate)
-    const diffTime = end.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
+	async function quickUpdateReceived(investment: { current_received: any; id: any }) {
+		modalInvestment = investment;
+		receivedAmount = '';
+		showReceivedModal = true;
+	}
 
-  function calculateDaysRunning(startDate: string | number | Date) {
-    const today = new Date()
-    const start = new Date(startDate)
-    const diffTime = today.getTime() - start.getTime()
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
+	async function updateReceivedAmount() {
+		if (!receivedAmount || isNaN(parseFloat(receivedAmount))) {
+			error = 'กรุณาใส่จำนวนเงินที่ถูกต้อง';
+			return;
+		}
 
-  // ข้อมูลสรุป
-  $: totalInvested = investments.reduce((sum, inv) => sum + parseFloat(inv.amount), 0)
-  $: totalReceived = investments.reduce((sum, inv) => sum + (parseFloat(inv.current_received) || 0), 0)
-  $: totalExpectedReturn = investments.reduce((sum, inv) => {
-    const expectedReturn = inv.expected_return || 0
-    return sum + parseFloat(expectedReturn)
-  }, 0)
-  $: totalProfit = totalReceived - totalInvested
-  $: activeInvestments = investments.filter(inv => inv.status === 'active')
-  $: completedInvestments = investments.filter(inv => inv.status === 'completed')
-  $: overallROI = totalInvested > 0 ? ((totalReceived - totalInvested) / totalInvested) * 100 : 0
-  
-  // Filtered investments
-  $: filteredInvestments = investments.filter(investment => {
-    // Filter by status
-    if (filterStatus !== 'all' && investment.status !== filterStatus) {
-      return false
-    }
-    
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      return (
-        (investment.product_type || '').toLowerCase().includes(query) ||
-        (investment.supplier || '').toLowerCase().includes(query) ||
-        (investment.customer || '').toLowerCase().includes(query) ||
-        (investment.notes || '').toLowerCase().includes(query) ||
-        investment.id.toString().includes(query)
-      )
-    }
-    
-    return true
-  })
-  
-  // ข้อมูลสำหรับกราฟ
-  $: chartData = {
-    monthly: getMonthlyData(),
-    roiComparison: getROIComparisonData(),
-    statusDistribution: getStatusDistributionData(),
-    productTypeData: getProductTypeData()
-  }
+		try {
+			const balanceBefore = modalInvestment.current_received || 0;
+			const amountToAdd = parseFloat(receivedAmount);
+			const totalReceived = balanceBefore + amountToAdd;
 
-  function getMonthlyData() {
-    console.log('Getting monthly data from investments:', investments) // Debug log
-    const monthlyStats: Record<string, { invested: number; received: number; count: number }> = {}
-    investments.forEach(inv => {
-      const month = inv.start_date.substring(0, 7) // YYYY-MM
-      if (!monthlyStats[month]) {
-        monthlyStats[month] = { invested: 0, received: 0, count: 0 }
-      }
-      monthlyStats[month].invested += parseFloat(inv.amount)
-      monthlyStats[month].received += parseFloat(inv.current_received || 0)
-      monthlyStats[month].count += 1
-    })
-    const result = Object.entries(monthlyStats).sort().slice(-6) // 6 เดือนล่าสุด
-    console.log('Monthly data result:', result) // Debug log
-    return result
-  }
+			await investmentService.updateInvestment(modalInvestment.id, {
+				current_received: totalReceived
+			});
 
-  function getROIComparisonData() {
-    const result = investments
-      .filter(inv => inv.current_received > 0)
-      .map(inv => ({
-        id: inv.id,
-        name: inv.product_type || `การลงทุน #${inv.id}`,
-        roi: ((parseFloat(inv.current_received) - parseFloat(inv.amount)) / parseFloat(inv.amount)) * 100,
-        amount: parseFloat(inv.amount)
-      }))
-      .sort((a, b) => b.roi - a.roi)
-      .slice(0, 5) // Top 5
-    console.log('ROI comparison data:', result) // Debug log
-    return result
-  }
+			// บันทึก log เงินเข้า (deposit)
+			await investmentLogService.logDeposit(
+				modalInvestment.id,
+				amountToAdd,
+				balanceBefore,
+				`รับเงินคืน: ${modalInvestment.product_type || 'การลงทุน #' + modalInvestment.id}`
+			);
 
-  function getStatusDistributionData() {
-    const statusCount: Record<string, number> = { active: 0, completed: 0, cancelled: 0 }
-    investments.forEach(inv => {
-      if (statusCount[inv.status] !== undefined) {
-        statusCount[inv.status] = (statusCount[inv.status] || 0) + 1
-      }
-    })
-    console.log('Status distribution:', statusCount) // Debug log
-    return statusCount
-  }
+			await loadInvestments();
+			closeReceivedModal();
+			error = null;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		}
+	}
 
-  function getProductTypeData() {
-    const typeStats: Record<string, { count: number; totalAmount: number; totalReceived: number }> = {}
-    investments.forEach(inv => {
-      const type = inv.product_type || 'อื่นๆ'
-      if (!typeStats[type]) {
-        typeStats[type] = { count: 0, totalAmount: 0, totalReceived: 0 }
-      }
-      typeStats[type].count += 1
-      typeStats[type].totalAmount += parseFloat(inv.amount)
-      typeStats[type].totalReceived += parseFloat(inv.current_received || 0)
-    })
-    const result = Object.entries(typeStats)
-      .map(([type, data]) => ({
-        type,
-        count: data.count,
-        amount: data.totalAmount,
-        received: data.totalReceived,
-        roi: data.totalAmount > 0 ? ((data.totalReceived - data.totalAmount) / data.totalAmount) * 100 : 0
-      }))
-      .sort((a, b) => b.amount - a.amount)
-    console.log('Product type data:', result) // Debug log
-    return result
-  }
+	function closeReceivedModal() {
+		showReceivedModal = false;
+		modalInvestment = null;
+		receivedAmount = '';
+	}
 
-  // Transaction History Functions
-  async function loadTransactionLogs(investmentId: number | null = null) {
-    try {
-      transactionLoading = true
-      selectedInvestmentForLogs = investmentId
-      transactionLogs = await investmentLogService.getLogs(investmentId)
-      transactionLoading = false
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'An error occurred loading transaction logs'
-      transactionLoading = false
-    }
-  }
+	async function updateInvestmentStatus(id: any, status: string) {
+		try {
+			await investmentService.updateInvestment(id, { status });
+			await loadInvestments();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		}
+	}
 
-  async function openTransactionHistory(investmentId: number | null = null) {
-    showTransactionHistory = true
-    await loadTransactionLogs(investmentId)
-  }
+	async function deleteInvestment(id: any) {
+		if (confirm('คุณแน่ใจหรือไม่ที่จะลบการลงทุนนี้?')) {
+			try {
+				await investmentService.deleteInvestment(id);
+				await loadInvestments();
+			} catch (err) {
+				error = err instanceof Error ? err.message : 'An error occurred';
+			}
+		}
+	}
 
-  function closeTransactionHistory() {
-    showTransactionHistory = false
-    transactionLogs = []
-    selectedInvestmentForLogs = null
-  }
+	async function addSampleData() {
+		try {
+			const sampleInvestments = [
+				{
+					amount: 10000,
+					start_date: '2024-11-01',
+					end_date: '2024-12-01',
+					expected_return: 12000,
+					current_received: 8000,
+					status: 'active',
+					notes: 'การลงทุนตัวอย่าง 1',
+					product_type: 'เสื้อผ้า',
+					supplier: 'ซัพพลายเออร์ A',
+					customer: 'Facebook',
+					profit_margin: 20
+				},
+				{
+					amount: 15000,
+					start_date: '2024-10-15',
+					end_date: '2024-11-15',
+					expected_return: 18000,
+					current_received: 18500,
+					status: 'completed',
+					notes: 'การลงทุนตัวอย่าง 2',
+					product_type: 'อิเล็กทรอนิกส์',
+					supplier: 'ซัพพลายเออร์ B',
+					customer: 'Shopee',
+					profit_margin: 25
+				},
+				{
+					amount: 8000,
+					start_date: '2024-12-01',
+					end_date: '2025-01-01',
+					expected_return: 9500,
+					current_received: 5000,
+					status: 'active',
+					notes: 'การลงทุนตัวอย่าง 3',
+					product_type: 'ของเล่น',
+					supplier: 'ซัพพลายเออร์ C',
+					customer: 'Lazada',
+					profit_margin: 18
+				}
+			];
 
-  function formatTransactionType(type: string) {
-    switch (type) {
-      case 'initial_investment':
-        return { label: 'สร้างการลงทุน', color: 'text-orange-600', bg: 'bg-orange-100', icon: '💸' }
-      case 'deposit':
-        return { label: 'เงินเข้า', color: 'text-green-600', bg: 'bg-green-100', icon: '💰' }
-      case 'withdrawal':
-        return { label: 'เงินออก', color: 'text-red-600', bg: 'bg-red-100', icon: '💳' }
-      default:
-        return { label: type, color: 'text-gray-600', bg: 'bg-gray-100', icon: '📝' }
-    }
-  }
+			for (const sample of sampleInvestments) {
+				await investmentService.addInvestment(sample);
+			}
 
-  function formatDate(dateString: string) {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+			await loadInvestments();
+			error = null;
+			console.log('Sample data added successfully');
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred while adding sample data';
+			console.error('Error adding sample data:', err);
+		}
+	}
 
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat('th-TH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount)
-  }
+	function calculateROI(investment: { current_received: number; amount: number }) {
+		const received = investment.current_received || 0;
+		if (received === 0) return null;
+		const roi = ((received - investment.amount) / investment.amount) * 100;
+		return roi.toFixed(2);
+	}
+
+	function calculateExpectedROI(investment: { expected_return: number; amount: number }) {
+		if (!investment.expected_return) return null;
+		const roi = ((investment.expected_return - investment.amount) / investment.amount) * 100;
+		return roi.toFixed(2);
+	}
+
+	function calculateProgress(investment: { expected_return: number; current_received: number }) {
+		if (!investment.expected_return || !investment.current_received) return 0;
+		const progress = (investment.current_received / investment.expected_return) * 100;
+		return Math.min(progress, 100).toFixed(1);
+	}
+
+	function calculateDaysLeft(endDate: string | number | Date) {
+		if (!endDate) return null;
+		const today = new Date();
+		const end = new Date(endDate);
+		const diffTime = end.getTime() - today.getTime();
+		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		return diffDays;
+	}
+
+	function calculateDaysRunning(startDate: string | number | Date) {
+		const today = new Date();
+		const start = new Date(startDate);
+		const diffTime = today.getTime() - start.getTime();
+		const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+		return diffDays;
+	}
+
+	// ข้อมูลสรุป
+	$: totalInvested = investments.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+	$: totalReceived = investments.reduce(
+		(sum, inv) => sum + (parseFloat(inv.current_received) || 0),
+		0
+	);
+	$: totalExpectedReturn = investments.reduce((sum, inv) => {
+		const expectedReturn = inv.expected_return || 0;
+		return sum + parseFloat(expectedReturn);
+	}, 0);
+	$: totalProfit = totalReceived - totalInvested;
+	$: activeInvestments = investments.filter((inv) => inv.status === 'active');
+	$: completedInvestments = investments.filter((inv) => inv.status === 'completed');
+	$: overallROI = totalInvested > 0 ? ((totalReceived - totalInvested) / totalInvested) * 100 : 0;
+
+	// Filtered investments
+	$: filteredInvestments = investments.filter((investment) => {
+		// Filter by status
+		if (filterStatus !== 'all' && investment.status !== filterStatus) {
+			return false;
+		}
+
+		// Filter by search query
+		if (searchQuery.trim()) {
+			const query = searchQuery.toLowerCase();
+			return (
+				(investment.product_type || '').toLowerCase().includes(query) ||
+				(investment.supplier || '').toLowerCase().includes(query) ||
+				(investment.customer || '').toLowerCase().includes(query) ||
+				(investment.notes || '').toLowerCase().includes(query) ||
+				investment.id.toString().includes(query)
+			);
+		}
+
+		return true;
+	});
+
+	// ข้อมูลสำหรับกราฟ
+	$: chartData = {
+		monthly: getMonthlyData(),
+		roiComparison: getROIComparisonData(),
+		statusDistribution: getStatusDistributionData(),
+		productTypeData: getProductTypeData()
+	};
+
+	function getMonthlyData() {
+		console.log('Getting monthly data from investments:', investments); // Debug log
+		const monthlyStats: Record<string, { invested: number; received: number; count: number }> = {};
+		investments.forEach((inv) => {
+			const month = inv.start_date.substring(0, 7); // YYYY-MM
+			if (!monthlyStats[month]) {
+				monthlyStats[month] = { invested: 0, received: 0, count: 0 };
+			}
+			monthlyStats[month].invested += parseFloat(inv.amount);
+			monthlyStats[month].received += parseFloat(inv.current_received || 0);
+			monthlyStats[month].count += 1;
+		});
+		const result = Object.entries(monthlyStats).sort().slice(-6); // 6 เดือนล่าสุด
+		console.log('Monthly data result:', result); // Debug log
+		return result;
+	}
+
+	function getROIComparisonData() {
+		const result = investments
+			.filter((inv) => inv.current_received > 0)
+			.map((inv) => ({
+				id: inv.id,
+				name: inv.product_type || `การลงทุน #${inv.id}`,
+				roi:
+					((parseFloat(inv.current_received) - parseFloat(inv.amount)) / parseFloat(inv.amount)) *
+					100,
+				amount: parseFloat(inv.amount)
+			}))
+			.sort((a, b) => b.roi - a.roi)
+			.slice(0, 5); // Top 5
+		console.log('ROI comparison data:', result); // Debug log
+		return result;
+	}
+
+	function getStatusDistributionData() {
+		const statusCount: Record<string, number> = { active: 0, completed: 0, cancelled: 0 };
+		investments.forEach((inv) => {
+			if (statusCount[inv.status] !== undefined) {
+				statusCount[inv.status] = (statusCount[inv.status] || 0) + 1;
+			}
+		});
+		console.log('Status distribution:', statusCount); // Debug log
+		return statusCount;
+	}
+
+	function getProductTypeData() {
+		const typeStats: Record<string, { count: number; totalAmount: number; totalReceived: number }> =
+			{};
+		investments.forEach((inv) => {
+			const type = inv.product_type || 'อื่นๆ';
+			if (!typeStats[type]) {
+				typeStats[type] = { count: 0, totalAmount: 0, totalReceived: 0 };
+			}
+			typeStats[type].count += 1;
+			typeStats[type].totalAmount += parseFloat(inv.amount);
+			typeStats[type].totalReceived += parseFloat(inv.current_received || 0);
+		});
+		const result = Object.entries(typeStats)
+			.map(([type, data]) => ({
+				type,
+				count: data.count,
+				amount: data.totalAmount,
+				received: data.totalReceived,
+				roi:
+					data.totalAmount > 0
+						? ((data.totalReceived - data.totalAmount) / data.totalAmount) * 100
+						: 0
+			}))
+			.sort((a, b) => b.amount - a.amount);
+		console.log('Product type data:', result); // Debug log
+		return result;
+	}
+
+	// Transaction History Functions
+	async function loadTransactionLogs(investmentId: number | null = null) {
+		try {
+			transactionLoading = true;
+			selectedInvestmentForLogs = investmentId;
+			transactionLogs = await investmentLogService.getLogs(investmentId);
+			transactionLoading = false;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred loading transaction logs';
+			transactionLoading = false;
+		}
+	}
+
+	async function openTransactionHistory(investmentId: number | null = null) {
+		showTransactionHistory = true;
+		await loadTransactionLogs(investmentId);
+	}
+
+	function closeTransactionHistory() {
+		showTransactionHistory = false;
+		transactionLogs = [];
+		selectedInvestmentForLogs = null;
+	}
+
+	function formatTransactionType(type: string) {
+		switch (type) {
+			case 'initial_investment':
+				return {
+					label: 'สร้างการลงทุน',
+					color: 'text-orange-600',
+					bg: 'bg-orange-100',
+					icon: '💸'
+				};
+			case 'deposit':
+				return { label: 'เงินเข้า', color: 'text-green-600', bg: 'bg-green-100', icon: '💰' };
+			case 'withdrawal':
+				return { label: 'เงินออก', color: 'text-red-600', bg: 'bg-red-100', icon: '💳' };
+			default:
+				return { label: type, color: 'text-gray-600', bg: 'bg-gray-100', icon: '📝' };
+		}
+	}
+
+	function formatDate(dateString: string) {
+		const date = new Date(dateString);
+		return date.toLocaleDateString('th-TH', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	function formatCurrency(amount: number) {
+		return new Intl.NumberFormat('th-TH', {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(amount);
+	}
 </script>
 
 {#if !isAuthenticated}
-  <!-- Login Screen -->
-  <div class="min-h-screen bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white flex items-center justify-center p-4">
-    <div class="w-full max-w-[400px]">
-      <div class="overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100">
-        <!-- Header Section -->
-        <div class="bg-[#1e293b] p-10 text-center text-white relative overflow-hidden">
-          <!-- Logo -->
-          <div class="relative z-10 mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-2xl bg-white shadow-xl overflow-hidden ring-4 ring-white/10">
-            <img src="/Twentytoy.jpg" alt="Twenty Toys Logo" class="h-full w-full object-cover" />
-          </div>
-          
-          <div class="relative z-10">
-            <h1 class="mb-2 text-2xl font-bold tracking-tight">Welcome Back</h1>
-            <p class="text-slate-400 text-sm font-medium">Twenty Toys Investment Tracker</p>
-          </div>
-          
-          <!-- Decorative subtle pattern/circles -->
-          <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
-          <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-slate-500/10 rounded-full blur-2xl"></div>
-        </div>
+	<!-- Login Screen -->
+	<div
+		class="flex min-h-screen items-center justify-center bg-slate-100/50 p-4 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white"
+	>
+		<div class="w-full max-w-[400px]">
+			<div class="overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100">
+				<!-- Header Section -->
+				<div class="relative overflow-hidden bg-[#1e293b] p-10 text-center text-white">
+					<!-- Logo -->
+					<div
+						class="relative z-10 mx-auto mb-6 flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-xl ring-4 ring-white/10"
+					>
+						<img src="/Twentytoy.jpg" alt="Twenty Toys Logo" class="h-full w-full object-cover" />
+					</div>
 
-        <!-- Form Section -->
-        <div class="px-8 py-10">
-          <form on:submit|preventDefault={handleLogin} class="space-y-6">
-            <div class="space-y-2">
-              <label for="username" class="block text-sm font-semibold text-slate-600 ml-1">Username</label>
-              <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
-                  <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <input 
-                  type="text" 
-                  id="username" 
-                  bind:value={loginUsername}
-                  required
-                  class="block w-full rounded-2xl border-0 bg-slate-100 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all"
-                  placeholder="admin@gmail.com"
-                />
-              </div>
-            </div>
-            
-            <div class="space-y-2">
-              <label for="password" class="block text-sm font-semibold text-slate-600 ml-1">Password</label>
-              <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
-                  <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <input 
-                  type="password" 
-                  id="password" 
-                  bind:value={loginPassword}
-                  required
-                  class="block w-full rounded-2xl border-0 bg-slate-100 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all"
-                  placeholder="••••••••••••"
-                />
-              </div>
-            </div>
-            
-            {#if loginError}
-              <div class="flex items-center gap-3 rounded-2xl bg-red-50 p-4 text-sm font-medium text-red-600 border border-red-100">
-                <svg class="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                </svg>
-                <span>{loginError}</span>
-              </div>
-            {/if}
-            
-            <button 
-              type="submit" 
-              class="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-base font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Sign In
-            </button>
-          </form>
-        </div>
-        
-        <div class="border-t border-slate-50 bg-slate-50/50 p-6 text-center">
-          <p class="text-xs text-slate-400 font-medium">© {new Date().getFullYear()} Twenty Toys System</p>
-        </div>
-      </div>
-    </div>
-  </div>
+					<div class="relative z-10">
+						<h1 class="mb-2 text-2xl font-bold tracking-tight">Welcome Back</h1>
+						<p class="text-sm font-medium text-slate-400">Twenty Toys Investment Tracker</p>
+					</div>
+
+					<!-- Decorative subtle pattern/circles -->
+					<div class="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5 blur-2xl"></div>
+					<div
+						class="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-slate-500/10 blur-2xl"
+					></div>
+				</div>
+
+				<!-- Form Section -->
+				<div class="px-8 py-10">
+					<form on:submit|preventDefault={handleLogin} class="space-y-6">
+						<div class="space-y-2">
+							<label for="username" class="ml-1 block text-sm font-semibold text-slate-600"
+								>Username</label
+							>
+							<div class="relative">
+								<div
+									class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400"
+								>
+									<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+										<path
+											fill-rule="evenodd"
+											d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+											clip-rule="evenodd"
+										/>
+									</svg>
+								</div>
+								<input
+									type="text"
+									id="username"
+									bind:value={loginUsername}
+									required
+									class="block w-full rounded-2xl border-0 bg-slate-100 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 transition-all focus:bg-white focus:ring-2 focus:ring-slate-900"
+									placeholder="admin@gmail.com"
+								/>
+							</div>
+						</div>
+
+						<div class="space-y-2">
+							<label for="password" class="ml-1 block text-sm font-semibold text-slate-600"
+								>Password</label
+							>
+							<div class="relative">
+								<div
+									class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400"
+								>
+									<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+										<path
+											fill-rule="evenodd"
+											d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+											clip-rule="evenodd"
+										/>
+									</svg>
+								</div>
+								<input
+									type="password"
+									id="password"
+									bind:value={loginPassword}
+									required
+									class="block w-full rounded-2xl border-0 bg-slate-100 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 transition-all focus:bg-white focus:ring-2 focus:ring-slate-900"
+									placeholder="••••••••••••"
+								/>
+							</div>
+						</div>
+
+						{#if loginError}
+							<div
+								class="flex items-center gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-600"
+							>
+								<svg class="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+									<path
+										fill-rule="evenodd"
+										d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+								<span>{loginError}</span>
+							</div>
+						{/if}
+
+						<button
+							type="submit"
+							class="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-base font-bold text-white shadow-lg shadow-slate-200 transition-all hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-xl active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							Sign In
+						</button>
+					</form>
+				</div>
+
+				<div class="border-t border-slate-50 bg-slate-50/50 p-6 text-center">
+					<p class="text-xs font-medium text-slate-400">
+						© {new Date().getFullYear()} Twenty Toys System
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
 {:else}
-  <!-- Main Application (ถ้าผ่าน login แล้ว) -->
-  <div class="min-h-screen bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white flex flex-col">
-  <header class="bg-indigo-600 text-white py-8 shadow-lg shadow-indigo-200/50">
-    <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
-      <div class=" flex-1">
-        <h1 class="text-3xl font-bold mb-1 tracking-tight">Twenty Toys</h1>
-        <p class="text-indigo-200 text-sm font-medium">Investment Portfolio Tracker</p>
-      </div>
-      <button 
-        on:click={handleLogout}
-        class="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 backdrop-blur-sm"
-      >
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-        </svg>
-        Sign Out
-      </button>
-    </div>
-  </header>
+	<!-- Main Application (ถ้าผ่าน login แล้ว) -->
+	<div
+		class="flex min-h-screen flex-col bg-slate-100/50 font-sans text-slate-800 selection:bg-indigo-500 selection:text-white"
+	>
+		<header class="bg-indigo-600 py-8 text-white shadow-lg shadow-indigo-200/50">
+			<div class="mx-auto flex max-w-6xl items-center justify-between px-4">
+				<div class=" flex-1">
+					<h1 class="mb-1 text-3xl font-bold tracking-tight">Twenty Toys</h1>
+					<p class="text-sm font-medium text-indigo-200">Investment Portfolio Tracker</p>
+				</div>
+				<button
+					on:click={handleLogout}
+					class="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-medium text-white backdrop-blur-sm transition-colors duration-200 hover:bg-white/20"
+				>
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+						/>
+					</svg>
+					Sign Out
+				</button>
+			</div>
+		</header>
 
-  <main class="py-10">
-    <div class="max-w-6xl mx-auto px-4">
-      <!-- Summary Cards -->
-      <section class="mb-12">
-        <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <span class="inline-block w-1 h-6 bg-indigo-500 rounded-full"></span>
-            Overview
-        </h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
-            <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Total Invested</h3>
-              <p class="text-2xl font-bold text-slate-900">{totalInvested.toLocaleString()}</p>
-              <span class="text-xs text-slate-400">THB</span>
-            </div>
-          </div>
-          
-          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
-            <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-300">
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Total Received</h3>
-              <p class="text-2xl font-bold text-emerald-600">{totalReceived.toLocaleString()}</p>
-              <span class="text-xs text-slate-400">THB</span>
-            </div>
-          </div>
-          
-          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
-            <div class="w-14 h-14 {totalProfit >= 0 ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600' : 'bg-red-50 text-red-600 group-hover:bg-red-600'} rounded-2xl flex items-center justify-center group-hover:text-white transition-colors duration-300">
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Net Profit</h3>
-              <p class="text-2xl font-bold {totalProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}">
-                {totalProfit >= 0 ? '+' : ''}{totalProfit.toLocaleString()}
-              </p>
-              <span class="text-xs text-slate-400">THB</span>
-            </div>
-          </div>
-          
-          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
-            <div class="w-14 h-14 {overallROI >= 0 ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600' : 'bg-red-50 text-red-600 group-hover:bg-red-600'} rounded-2xl flex items-center justify-center group-hover:text-white transition-colors duration-300">
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Overall ROI</h3>
-              <p class="text-2xl font-bold {overallROI >= 0 ? 'text-indigo-600' : 'text-red-600'}">
-                {overallROI >= 0 ? '+' : ''}{overallROI.toFixed(1)}
-              </p>
-              <span class="text-xs text-slate-400">%</span>
-            </div>
-          </div>
-          
-          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
-            <div class="w-14 h-14 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-colors duration-300">
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Active Deals</h3>
-              <p class="text-2xl font-bold text-orange-600">{activeInvestments.length}</p>
-              <span class="text-xs text-slate-400">In Progress</span>
-            </div>
-          </div>
-          
-          <div class="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-200 group">
-            <div class="w-14 h-14 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-colors duration-300">
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Completed</h3>
-              <p class="text-2xl font-bold text-green-600">{completedInvestments.length}</p>
-              <span class="text-xs text-slate-400">Success</span>
-            </div>
-          </div>
-        </div>
-      </section>
+		<main class="py-10">
+			<div class="mx-auto max-w-6xl px-4">
+				<!-- Summary Cards -->
+				<section class="mb-12">
+					<h2 class="mb-6 flex items-center gap-2 text-xl font-bold text-slate-800">
+						<span class="inline-block h-6 w-1 rounded-full bg-indigo-500"></span>
+						Overview
+					</h2>
+					<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+						<div
+							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+						>
+							<div
+								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 transition-colors duration-300 group-hover:bg-indigo-600 group-hover:text-white"
+							>
+								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+									/>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+									Total Invested
+								</h3>
+								<p class="text-2xl font-bold text-slate-900">{totalInvested.toLocaleString()}</p>
+								<span class="text-xs text-slate-400">THB</span>
+							</div>
+						</div>
 
-      {#if error}
-        <div class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-center gap-2 mb-6">
-          <span>⚠️</span>
-          <span>{error}</span>
-        </div>
-      {/if}
+						<div
+							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+						>
+							<div
+								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 transition-colors duration-300 group-hover:bg-emerald-600 group-hover:text-white"
+							>
+								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+									Total Received
+								</h3>
+								<p class="text-2xl font-bold text-emerald-600">{totalReceived.toLocaleString()}</p>
+								<span class="text-xs text-slate-400">THB</span>
+							</div>
+						</div>
 
-      <!-- Action Bar -->
-      <section class="mb-12">
-        <div class="flex flex-wrap gap-4">
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => {
-            showAddForm = !showAddForm
-            showEditModal = false
-            editingInvestment = null
-            editModalInvestment = null
-            if (showAddForm) resetForm()
-          }}>
-            <span>{showAddForm ? '❌' : '➕'}</span>
-            {showAddForm ? 'Cancel' : 'Add Investment'}
-          </button>
-          
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => showCharts = !showCharts}>
-            <span>📊</span>
-            {showCharts ? 'Hide Charts' : 'Show Charts'}
-          </button>
-          
-          
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200" on:click={() => openTransactionHistory(null)}>
-            <span>📜</span>
-            Transactions
-          </button>
-          
-          <!-- Quick Filter Buttons -->
-          <div class="flex flex-wrap gap-2 ml-auto">
-            <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-              on:click={() => filterStatus = 'all'}
-            >
-              <span>📋</span>
-              All
-            </button>
-            <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'active' ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-              on:click={() => filterStatus = 'active'}
-            >
-              <span>🔄</span>
-              Active
-            </button>
-            <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'completed' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-              on:click={() => filterStatus = 'completed'}
-            >
-              <span>✅</span>
-              Completed
-            </button>
-            <button 
-              class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'cancelled' ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-              on:click={() => filterStatus = 'cancelled'}
-            >
-              <span>❌</span>
-              Cancelled
-            </button>
-          </div>
-        </div>
-      </section>
+						<div
+							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+						>
+							<div
+								class="h-14 w-14 {totalProfit >= 0
+									? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600'
+									: 'bg-red-50 text-red-600 group-hover:bg-red-600'} flex items-center justify-center rounded-2xl transition-colors duration-300 group-hover:text-white"
+							>
+								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+									/>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+									Net Profit
+								</h3>
+								<p
+									class="text-2xl font-bold {totalProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}"
+								>
+									{totalProfit >= 0 ? '+' : ''}{totalProfit.toLocaleString()}
+								</p>
+								<span class="text-xs text-slate-400">THB</span>
+							</div>
+						</div>
 
-      <!-- Charts Section -->
-      {#if showCharts}
-        <section class="charts-section">
-          <h2 class="section-title">📈 Analytics and Statistics</h2>
-          
-          <!-- Debug Info -->
-          <div class="debug-info" style="background: #f0f0f0; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem;">
-            <p>Investments count: {investments.length}</p>
-            <p>Chart data available: {JSON.stringify(Object.keys(chartData))}</p>
-            <p>ROI comparison items: {chartData.roiComparison.length}</p>
-            <p>Monthly data items: {chartData.monthly.length}</p>
-            <p>Product types: {chartData.productTypeData.length}</p>
-          </div>
-          
-          <div class="charts-grid">
-            <!-- ROI Comparison Chart -->
-            <div class="chart-card">
-              <h3 class="chart-title">🏆 Top 5 ROI Investments</h3>
-              <div class="chart-content">
-                {#each chartData.roiComparison as item, index}
-                  <div class="roi-bar">
-                    <div class="roi-info">
-                      <span class="roi-rank">#{index + 1}</span>
-                      <span class="roi-name">{item.name}</span>
-                      <span class="roi-value {item.roi >= 0 ? 'positive' : 'negative'}">
-                        {item.roi.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div class="roi-bar-container">
-                      <div 
-                        class="roi-bar-fill {item.roi >= 0 ? 'positive' : 'negative'}" 
-                        style="width: {Math.min(Math.abs(item.roi) * 2, 100)}%"
-                      ></div>
-                    </div>
-                  </div>
-                {/each}
-                {#if chartData.roiComparison.length === 0}
-                  <p class="no-data">No ROI data available</p>
-                {/if}
-              </div>
-            </div>
+						<div
+							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+						>
+							<div
+								class="h-14 w-14 {overallROI >= 0
+									? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600'
+									: 'bg-red-50 text-red-600 group-hover:bg-red-600'} flex items-center justify-center rounded-2xl transition-colors duration-300 group-hover:text-white"
+							>
+								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+									/>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+									Overall ROI
+								</h3>
+								<p
+									class="text-2xl font-bold {overallROI >= 0 ? 'text-indigo-600' : 'text-red-600'}"
+								>
+									{overallROI >= 0 ? '+' : ''}{overallROI.toFixed(1)}
+								</p>
+								<span class="text-xs text-slate-400">%</span>
+							</div>
+						</div>
 
-            <!-- Status Distribution -->
-            <div class="chart-card">
-              <h3 class="chart-title">📊 Investment Status</h3>
-              <div class="chart-content">
-                {#if Object.values(chartData.statusDistribution).some(v => v > 0)}
-                  <div class="status-chart">
-                    {#each Object.entries(chartData.statusDistribution) as [status, count]}
-                      {#if count > 0}
-                        <div class="status-bar-item">
-                          <span class="status-label">{status}</span>
-                          <div class="status-bar-track">
-                             <div 
-                               class="status-bar-fill status-{status}" 
-                               style="width: {(count / investments.length) * 100}%"
-                             ></div>
-                          </div>
-                          <span class="status-count">{count} ({(count / investments.length * 100).toFixed(0)}%)</span>
-                        </div>
-                      {/if}
-                    {/each}
-                  </div>
-                {:else}
-                  <p class="no-data">No Status data available</p>
-                {/if}
-              </div>
-            </div>
+						<div
+							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+						>
+							<div
+								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 transition-colors duration-300 group-hover:bg-orange-600 group-hover:text-white"
+							>
+								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+									Active Deals
+								</h3>
+								<p class="text-2xl font-bold text-orange-600">{activeInvestments.length}</p>
+								<span class="text-xs text-slate-400">In Progress</span>
+							</div>
+						</div>
 
-            <!-- Monthly Investment Trend -->
-            <div class="chart-card full-width">
-              <h3 class="chart-title">📅 Monthly Investment Trend (Last 6 Months)</h3>
-              <div class="chart-content">
-                {#if chartData.monthly.length > 0}
-                  <div class="monthly-chart">
-                    {#each chartData.monthly as [month, data]}
-                      <div class="monthly-item">
-                        <div class="monthly-bars">
-                          <div class="bar-container">
-                            <div 
-                              class="bar invested" 
-                              style="height: {(data.invested / Math.max(...chartData.monthly.map(([,d]) => (d as any).invested))) * 100}%"
-                              title="Invested: {data.invested.toLocaleString()} THB"
-                            ></div>
-                          </div>
-                          <div class="bar-container">
-                            <div 
-                              class="bar received" 
-                              style="height: {(data.received / Math.max(...chartData.monthly.map(([,d]) => (d as any).invested))) * 100}%"
-                              title="Received: {data.received.toLocaleString()} THB"
-                            ></div>
-                          </div>
-                        </div>
-                        <div class="monthly-label">{month}</div>
-                        <div class="monthly-count">{data.count} Deals</div>
-                      </div>
-                    {/each}
-                  </div>
-                  <div class="chart-legend">
-                    <div class="legend-item">
-                      <div class="legend-color invested"></div>
-                      <span>Invested Amount</span>
-                    </div>
-                    <div class="legend-item">
-                      <div class="legend-color received"></div>
-                      <span>เงินที่ได้รับ</span>
-                    </div>
-                  </div>
-                {:else}
-                  <p class="no-data">ยังไม่มีข้อมูลรายเดือน</p>
-                {/if}
-              </div>
-            </div>
+						<div
+							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+						>
+							<div
+								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 text-green-600 transition-colors duration-300 group-hover:bg-green-600 group-hover:text-white"
+							>
+								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+									Completed
+								</h3>
+								<p class="text-2xl font-bold text-green-600">{completedInvestments.length}</p>
+								<span class="text-xs text-slate-400">Success</span>
+							</div>
+						</div>
+					</div>
+				</section>
 
-            <!-- Product Type Analysis -->
-            <div class="chart-card full-width">
-              <h3 class="chart-title">🛍️ วิเคราะห์ตามประเภทสินค้า</h3>
-              <div class="chart-content">
-                {#if chartData.productTypeData.length > 0}
-                  <div class="product-table">
-                    <div class="table-header">
-                      <div>ประเภทสินค้า</div>
-                      <div>จำนวนรอบ</div>
-                      <div>เงินลงทุน</div>
-                      <div>เงินที่ได้รับ</div>
-                      <div>ROI</div>
-                    </div>
-                    {#each chartData.productTypeData as item}
-                      <div class="table-row">
-                        <div class="product-name">{item.type}</div>
-                        <div class="product-count">{item.count}</div>
-                        <div class="product-amount">{item.amount.toLocaleString()}</div>
-                        <div class="product-received">{item.received.toLocaleString()}</div>
-                        <div class="product-roi {item.roi >= 0 ? 'positive' : 'negative'}">
-                          {item.roi.toFixed(1)}%
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                {:else}
-                  <p class="no-data">ยังไม่มีข้อมูลประเภทสินค้า</p>
-                {/if}
-              </div>
-            </div>
-          </div>
-        </section>
-      {/if}
+				{#if error}
+					<div
+						class="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
+					>
+						<span>⚠️</span>
+						<span>{error}</span>
+					</div>
+				{/if}
 
-      <!-- Add Investment Form -->
-      {#if showAddForm}
-        <section class="p-6 bg-white rounded-lg shadow-lg border border-pink-200">
-          <div class="space-y-6">
-            <div class="text-center border-b border-pink-200 pb-4">
-              <h3 class="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-                <span class="text-2xl">➕</span>
-                เพิ่มการลงทุนใหม่
-              </h3>
-            </div>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="space-y-2">
-          <label for="amount" class="block text-sm font-medium text-gray-700">จำนวนเงินลงทุน (บาท) *</label>
-          <input type="number" id="amount" bind:value={formData.amount} placeholder="8000" 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="start_date" class="block text-sm font-medium text-gray-700">วันที่เริ่มต้น *</label>
-          <input type="date" id="start_date" bind:value={formData.start_date} 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="end_date" class="block text-sm font-medium text-gray-700">วันที่คาดว่าจะจบ</label>
-          <input type="date" id="end_date" bind:value={formData.end_date} 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="expected_return" class="block text-sm font-medium text-gray-700">ผลตอบแทนที่คาดหวัง (บาท)</label>
-          <input type="number" id="expected_return" bind:value={formData.expected_return} placeholder="9600" 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="current_received" class="block text-sm font-medium text-gray-700">เงินที่ได้รับแล้ว (บาท)</label>
-          <input type="number" id="current_received" bind:value={formData.current_received} placeholder="0" 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="status" class="block text-sm font-medium text-gray-700">สถานะ</label>
-          <select id="status" bind:value={formData.status} 
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500">
-            <option value="active">กำลังดำเนินการ</option>
-            <option value="completed">เสร็จสิ้น</option>
-            <option value="cancelled">ยกเลิก</option>
-          </select>
-        </div>
-        
-        <div class="space-y-2">
-          <label for="product_type" class="block text-sm font-medium text-gray-700">ประเภทสินค้า</label>
-          <input type="text" id="product_type" bind:value={formData.product_type} placeholder="เสื้อผ้า, อิเล็กทรอนิกส์, ของเล่น..." 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="supplier" class="block text-sm font-medium text-gray-700">ซัพพลายเออร์/แหล่งซื้อ</label>
-          <input type="text" id="supplier" bind:value={formData.supplier} placeholder="ชื่อร้าน, ผู้ผลิต..." 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="customer" class="block text-sm font-medium text-gray-700">ลูกค้า/ช่องทางขาย</label>
-          <input type="text" id="customer" bind:value={formData.customer} placeholder="Facebook, Shopee, ลูกค้าเก่า..." 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2">
-          <label for="profit_margin" class="block text-sm font-medium text-gray-700">เปอร์เซ็นต์กำไรที่คาดหวัง (%)</label>
-          <input type="number" id="profit_margin" bind:value={formData.profit_margin} placeholder="20" step="0.01" 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500" />
-        </div>
-        
-        <div class="space-y-2 md:col-span-2">
-          <label for="notes" class="block text-sm font-medium text-gray-700">หมายเหตุ/รายละเอียด</label>
-          <textarea id="notes" bind:value={formData.notes} placeholder="พรีออร์เดอร์ของใหม่, ข้อมูลเพิ่มเติม..." 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 min-h-[80px]"></textarea>
-        </div>
-      </div>
-            
-            <div class="flex flex-col sm:flex-row gap-3 pt-4">
-                <button class="flex-1 bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2" on:click={addInvestment}>
-                  <span class="text-lg">💾</span>
-                  บันทึก
-                </button>
-                <button class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2" on:click={() => {
-                  showAddForm = false
-                  resetForm()
-                }}>
-                  <span class="text-lg">❌</span>
-                  ยกเลิก
-                </button>
-            </div>
-          </div>
-        </section>
-      {/if}
+				<!-- Action Bar -->
+				<section class="mb-12">
+					<div class="flex flex-wrap gap-4">
+						<button
+							class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-lg"
+							on:click={() => {
+								showAddForm = !showAddForm;
+								showEditModal = false;
+								editingInvestment = null;
+								editModalInvestment = null;
+								if (showAddForm) resetForm();
+							}}
+						>
+							<span>{showAddForm ? '❌' : '➕'}</span>
+							{showAddForm ? 'Cancel' : 'Add Investment'}
+						</button>
 
-      <!-- Received Amount Modal -->
-      {#if showReceivedModal && modalInvestment}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={closeReceivedModal} role="dialog" aria-modal="true">
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-static-element-interactions -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation={() => {}} role="document">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span class="text-2xl">💰</span>
-                เพิ่มเงินที่ได้รับ
-              </h3>
-              <button class="text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors" on:click={closeReceivedModal}>
-                <span>✕</span>
-              </button>
-            </div>
-            
-            <div class="p-6 space-y-6">
-              <div class="bg-pink-50 p-4 rounded-lg border border-pink-200">
-                <h4 class="font-semibold text-gray-800 mb-3">{modalInvestment.product_type || 'การลงทุน'} #{modalInvestment.id}</h4>
-                <div class="space-y-2">
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">เงินลงทุน:</span>
-                    <span class="font-medium text-gray-800">{parseFloat(modalInvestment.amount).toLocaleString()} บาท</span>
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">ได้รับแล้ว:</span>
-                    <span class="font-medium text-green-600">{(modalInvestment.current_received || 0).toLocaleString()} บาท</span>
-                  </div>
-                  {#if modalInvestment.expected_return}
-                    <div class="flex justify-between items-center">
-                      <span class="text-sm text-gray-600">เป้าหมาย:</span>
-                      <span class="font-medium text-blue-600">{parseFloat(modalInvestment.expected_return).toLocaleString()} บาท</span>
-                    </div>
-                  {/if}
-                </div>
-              </div>
+						<button
+							class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-6 py-3 font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-lg"
+							on:click={() => (showCharts = !showCharts)}
+						>
+							<span>📊</span>
+							{showCharts ? 'Hide Charts' : 'Show Charts'}
+						</button>
 
-              <div class="space-y-4">
-                <div class="space-y-2">
-                  <label for="received-amount" class="block text-sm font-medium text-gray-700">จำนวนเงินที่ได้รับเพิ่มเติม (บาท)</label>
-                  <!-- svelte-ignore a11y-autofocus -->
-                  <input 
-                    type="number" 
-                    id="received-amount" 
-                    bind:value={receivedAmount} 
-                    placeholder="เช่น 2000" 
-                    step="0.01"
-                    min="0"
-                    autofocus
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
-                
-                {#if receivedAmount && !isNaN(parseFloat(receivedAmount))}
-                  <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div class="space-y-2 text-sm">
-                      <div class="flex justify-between items-center">
-                        <span>ได้รับแล้ว:</span>
-                        <span class="font-medium">{(modalInvestment.current_received || 0).toLocaleString()} บาท</span>
-                      </div>
-                      <div class="flex justify-between items-center text-green-600">
-                        <span>+ เพิ่มเติม:</span>
-                        <span class="font-medium">{parseFloat(receivedAmount).toLocaleString()} บาท</span>
-                      </div>
-                      <div class="flex justify-between items-center border-t border-gray-300 pt-2 font-semibold text-lg">
-                        <span>= รวม:</span>
-                        <span class="text-pink-600">{((modalInvestment.current_received || 0) + parseFloat(receivedAmount)).toLocaleString()} บาท</span>
-                      </div>
-                    </div>
-                  </div>
-                {/if}
-              </div>
-            </div>
-            
-            <div class="flex flex-col sm:flex-row gap-3 p-6 border-t border-gray-200">
-              <button class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2" on:click={closeReceivedModal}>
-                <span class="text-lg">❌</span>
-                ยกเลิก
-              </button>
-              <button 
-                class="flex-1 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2" 
-                on:click={updateReceivedAmount}
-                disabled={!receivedAmount || isNaN(parseFloat(receivedAmount)) || parseFloat(receivedAmount) <= 0}
-              >
-                <span class="text-lg">💾</span>
-                บันทึก
-              </button>
-            </div>
-          </div>
-        </div>
-      {/if}
+						<button
+							class="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-purple-700 hover:shadow-lg"
+							on:click={() => openTransactionHistory(null)}
+						>
+							<span>📜</span>
+							Transactions
+						</button>
 
-      <!-- Edit Investment Modal -->
-      {#if showEditModal && editModalInvestment}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={closeEditModal} role="dialog" aria-modal="true">
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-static-element-interactions -->
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation={() => {}} role="document">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span class="text-2xl">✏️</span>
-                แก้ไขการลงทุน
-              </h3>
-              <button class="text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors" on:click={closeEditModal}>×</button>
-            </div>
-            
-            <div class="p-6">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-2">
-                  <label for="edit-amount" class="block text-sm font-medium text-gray-700">จำนวนเงินลงทุน (บาท) *</label>
-                  <input 
-                    id="edit-amount" 
-                    type="number" 
-                    bind:value={formData.amount} 
-                    required 
-                    min="1"
-                    placeholder="เช่น 10000"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+						<!-- Quick Filter Buttons -->
+						<div class="ml-auto flex flex-wrap gap-2">
+							<button
+								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'all'
+									? 'bg-indigo-600 text-white'
+									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
+								on:click={() => (filterStatus = 'all')}
+							>
+								<span>📋</span>
+								All
+							</button>
+							<button
+								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'active'
+									? 'bg-orange-500 text-white'
+									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
+								on:click={() => (filterStatus = 'active')}
+							>
+								<span>🔄</span>
+								Active
+							</button>
+							<button
+								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'completed'
+									? 'bg-green-600 text-white'
+									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
+								on:click={() => (filterStatus = 'completed')}
+							>
+								<span>✅</span>
+								Completed
+							</button>
+							<button
+								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'cancelled'
+									? 'bg-red-500 text-white'
+									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
+								on:click={() => (filterStatus = 'cancelled')}
+							>
+								<span>❌</span>
+								Cancelled
+							</button>
+						</div>
+					</div>
+				</section>
 
-                <div class="space-y-2">
-                  <label for="edit-start-date" class="block text-sm font-medium text-gray-700">วันที่เริ่มลงทุน *</label>
-                  <input 
-                    id="edit-start-date" 
-                    type="date" 
-                    bind:value={formData.start_date} 
-                    required 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+				<!-- Charts Section -->
+				{#if showCharts}
+					<section class="charts-section">
+						<h2 class="section-title">📈 Analytics and Statistics</h2>
 
-                <div class="space-y-2">
-                  <label for="edit-end-date" class="block text-sm font-medium text-gray-700">วันที่คาดหวังคืนทุน</label>
-                  <input 
-                    id="edit-end-date" 
-                    type="date" 
-                    bind:value={formData.end_date} 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+						<!-- Debug Info -->
+						<div
+							class="debug-info"
+							style="background: #f0f0f0; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem;"
+						>
+							<p>Investments count: {investments.length}</p>
+							<p>Chart data available: {JSON.stringify(Object.keys(chartData))}</p>
+							<p>ROI comparison items: {chartData.roiComparison.length}</p>
+							<p>Monthly data items: {chartData.monthly.length}</p>
+							<p>Product types: {chartData.productTypeData.length}</p>
+						</div>
 
-                <div class="space-y-2">
-                  <label for="edit-expected-return" class="block text-sm font-medium text-gray-700">ผลตอบแทนที่คาดหวัง (บาท)</label>
-                  <input 
-                    id="edit-expected-return" 
-                    type="number" 
-                    bind:value={formData.expected_return} 
-                    min="0"
-                    placeholder="เช่น 12000"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+						<div class="charts-grid">
+							<!-- ROI Comparison Chart -->
+							<div class="chart-card">
+								<h3 class="chart-title">🏆 Top 5 ROI Investments</h3>
+								<div class="chart-content">
+									{#each chartData.roiComparison as item, index}
+										<div class="roi-bar">
+											<div class="roi-info">
+												<span class="roi-rank">#{index + 1}</span>
+												<span class="roi-name">{item.name}</span>
+												<span class="roi-value {item.roi >= 0 ? 'positive' : 'negative'}">
+													{item.roi.toFixed(1)}%
+												</span>
+											</div>
+											<div class="roi-bar-container">
+												<div
+													class="roi-bar-fill {item.roi >= 0 ? 'positive' : 'negative'}"
+													style="width: {Math.min(Math.abs(item.roi) * 2, 100)}%"
+												></div>
+											</div>
+										</div>
+									{/each}
+									{#if chartData.roiComparison.length === 0}
+										<p class="no-data">No ROI data available</p>
+									{/if}
+								</div>
+							</div>
 
-                <div class="space-y-2">
-                  <label for="edit-current-received" class="block text-sm font-medium text-gray-700">เงินที่ได้รับแล้ว (บาท)</label>
-                  <input 
-                    id="edit-current-received" 
-                    type="number" 
-                    bind:value={formData.current_received} 
-                    min="0"
-                    placeholder="เช่น 5000"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+							<!-- Status Distribution -->
+							<div class="chart-card">
+								<h3 class="chart-title">📊 Investment Status</h3>
+								<div class="chart-content">
+									{#if Object.values(chartData.statusDistribution).some((v) => v > 0)}
+										<div class="status-chart">
+											{#each Object.entries(chartData.statusDistribution) as [status, count]}
+												{#if count > 0}
+													<div class="status-bar-item">
+														<span class="status-label">{status}</span>
+														<div class="status-bar-track">
+															<div
+																class="status-bar-fill status-{status}"
+																style="width: {(count / investments.length) * 100}%"
+															></div>
+														</div>
+														<span class="status-count"
+															>{count} ({((count / investments.length) * 100).toFixed(0)}%)</span
+														>
+													</div>
+												{/if}
+											{/each}
+										</div>
+									{:else}
+										<p class="no-data">No Status data available</p>
+									{/if}
+								</div>
+							</div>
 
-                <div class="space-y-2">
-                  <label for="edit-status" class="block text-sm font-medium text-gray-700">สถานะ</label>
-                  <select id="edit-status" bind:value={formData.status} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500">
-                    <option value="active">กำลังดำเนินการ</option>
-                    <option value="completed">เสร็จสิ้น</option>
-                    <option value="cancelled">ยกเลิก</option>
-                  </select>
-                </div>
+							<!-- Monthly Investment Trend -->
+							<div class="chart-card full-width">
+								<h3 class="chart-title">📅 Monthly Investment Trend (Last 6 Months)</h3>
+								<div class="chart-content">
+									{#if chartData.monthly.length > 0}
+										<div class="monthly-chart">
+											{#each chartData.monthly as [month, data]}
+												<div class="monthly-item">
+													<div class="monthly-bars">
+														<div class="bar-container">
+															<div
+																class="bar invested"
+																style="height: {(data.invested /
+																	Math.max(
+																		...chartData.monthly.map(([, d]) => (d as any).invested)
+																	)) *
+																	100}%"
+																title="Invested: {data.invested.toLocaleString()} THB"
+															></div>
+														</div>
+														<div class="bar-container">
+															<div
+																class="bar received"
+																style="height: {(data.received /
+																	Math.max(
+																		...chartData.monthly.map(([, d]) => (d as any).invested)
+																	)) *
+																	100}%"
+																title="Received: {data.received.toLocaleString()} THB"
+															></div>
+														</div>
+													</div>
+													<div class="monthly-label">{month}</div>
+													<div class="monthly-count">{data.count} Deals</div>
+												</div>
+											{/each}
+										</div>
+										<div class="chart-legend">
+											<div class="legend-item">
+												<div class="legend-color invested"></div>
+												<span>Invested Amount</span>
+											</div>
+											<div class="legend-item">
+												<div class="legend-color received"></div>
+												<span>เงินที่ได้รับ</span>
+											</div>
+										</div>
+									{:else}
+										<p class="no-data">ยังไม่มีข้อมูลรายเดือน</p>
+									{/if}
+								</div>
+							</div>
 
-                <div class="space-y-2">
-                  <label for="edit-product-type" class="block text-sm font-medium text-gray-700">ประเภทสินค้า</label>
-                  <input 
-                    id="edit-product-type" 
-                    type="text" 
-                    bind:value={formData.product_type} 
-                    placeholder="เช่น เสื้อผ้า, อิเล็กทรอนิกส์"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+							<!-- Product Type Analysis -->
+							<div class="chart-card full-width">
+								<h3 class="chart-title">🛍️ วิเคราะห์ตามประเภทสินค้า</h3>
+								<div class="chart-content">
+									{#if chartData.productTypeData.length > 0}
+										<div class="product-table">
+											<div class="table-header">
+												<div>ประเภทสินค้า</div>
+												<div>จำนวนรอบ</div>
+												<div>เงินลงทุน</div>
+												<div>เงินที่ได้รับ</div>
+												<div>ROI</div>
+											</div>
+											{#each chartData.productTypeData as item}
+												<div class="table-row">
+													<div class="product-name">{item.type}</div>
+													<div class="product-count">{item.count}</div>
+													<div class="product-amount">{item.amount.toLocaleString()}</div>
+													<div class="product-received">{item.received.toLocaleString()}</div>
+													<div class="product-roi {item.roi >= 0 ? 'positive' : 'negative'}">
+														{item.roi.toFixed(1)}%
+													</div>
+												</div>
+											{/each}
+										</div>
+									{:else}
+										<p class="no-data">ยังไม่มีข้อมูลประเภทสินค้า</p>
+									{/if}
+								</div>
+							</div>
+						</div>
+					</section>
+				{/if}
 
-                <div class="space-y-2">
-                  <label for="edit-supplier" class="block text-sm font-medium text-gray-700">ซัพพลายเออร์</label>
-                  <input 
-                    id="edit-supplier" 
-                    type="text" 
-                    bind:value={formData.supplier} 
-                    placeholder="เช่น บริษัท ABC"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+				<!-- Add Investment Form -->
+				{#if showAddForm}
+					<section class="rounded-lg border border-pink-200 bg-white p-6 shadow-lg">
+						<div class="space-y-6">
+							<div class="border-b border-pink-200 pb-4 text-center">
+								<h3 class="flex items-center justify-center gap-2 text-2xl font-bold text-gray-800">
+									<span class="text-2xl">➕</span>
+									เพิ่มการลงทุนใหม่
+								</h3>
+							</div>
 
-                <div class="space-y-2">
-                  <label for="edit-customer" class="block text-sm font-medium text-gray-700">ลูกค้า/แพลตฟอร์ม</label>
-                  <input 
-                    id="edit-customer" 
-                    type="text" 
-                    bind:value={formData.customer} 
-                    placeholder="เช่น Facebook, Shopee, Lazada"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+							<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+								<div class="space-y-2">
+									<label for="amount" class="block text-sm font-medium text-gray-700"
+										>จำนวนเงินลงทุน (บาท) *</label
+									>
+									<input
+										type="number"
+										id="amount"
+										bind:value={formData.amount}
+										placeholder="8000"
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
 
-                <div class="space-y-2">
-                  <label for="edit-profit-margin" class="block text-sm font-medium text-gray-700">กำไรต่อหน่วย (%)</label>
-                  <input 
-                    id="edit-profit-margin" 
-                    type="number" 
-                    bind:value={formData.profit_margin} 
-                    min="0"
-                    step="0.01"
-                    placeholder="เช่น 15.5"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  />
-                </div>
+								<div class="space-y-2">
+									<label for="start_date" class="block text-sm font-medium text-gray-700"
+										>วันที่เริ่มต้น *</label
+									>
+									<input
+										type="date"
+										id="start_date"
+										bind:value={formData.start_date}
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
 
-                <div class="space-y-2 md:col-span-2">
-                  <label for="edit-notes" class="block text-sm font-medium text-gray-700">หมายเหตุ</label>
-                  <textarea 
-                    id="edit-notes" 
-                    bind:value={formData.notes} 
-                    placeholder="พรีออร์เดอร์ของใหม่, ข้อมูลเพิ่มเติม..."
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 min-h-[80px]"
-                  ></textarea>
-                </div>
-              </div>
-            </div>
-            
-            <div class="flex flex-col sm:flex-row gap-3 p-6 border-t border-gray-200">
-              <button class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2" on:click={closeEditModal}>
-                <span class="text-lg">❌</span>
-                ยกเลิก
-              </button>
-              <button class="flex-1 bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2" on:click={updateInvestment}>
-                <span class="text-lg">💾</span>
-                บันทึกการแก้ไข
-              </button>
-            </div>
-          </div>
-        </div>
-      {/if}
+								<div class="space-y-2">
+									<label for="end_date" class="block text-sm font-medium text-gray-700"
+										>วันที่คาดว่าจะจบ</label
+									>
+									<input
+										type="date"
+										id="end_date"
+										bind:value={formData.end_date}
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
 
-      <!-- Investments List -->
-      {#if loading}
-        <section class="flex flex-col items-center justify-center py-12 bg-white rounded-lg shadow-lg border border-pink-200">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
-          <p class="mt-4 text-gray-600 font-medium">กำลังโหลดข้อมูล...</p>
-        </section>
-      {:else}
-        <section class="space-y-6">
-          <!-- Filter Section -->
-          <div class="bg-white rounded-lg shadow-lg border border-pink-200 p-6">
-            <div class="flex flex-col gap-4">
-              <!-- Header -->
-              <div class="flex items-center gap-2 text-lg font-medium text-gray-700">
-                <span>🔍</span>
-                <span>กรองและค้นหา</span>
-              </div>
-              
-              <!-- Filters Container -->
-              <div class="flex flex-col sm:flex-row gap-4">
-                <!-- Status Filter -->
-                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                  <label for="status-filter" class="text-sm font-medium text-gray-600 whitespace-nowrap">สถานะ:</label>
-                  <select 
-                    id="status-filter" 
-                    bind:value={filterStatus}
-                    class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                  >
-                    <option value="all">ทั้งหมด</option>
-                    <option value="active">กำลังดำเนินการ</option>
-                    <option value="completed">เสร็จสิ้น</option>
-                    <option value="cancelled">ยกเลิก</option>
-                  </select>
-                </div>
-                
-                <!-- Search Input -->
-                <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1">
-                  <label for="search-input" class="text-sm font-medium text-gray-600 whitespace-nowrap">ค้นหา:</label>
-                  <div class="flex items-center gap-2 flex-1">
-                    <input 
-                      id="search-input"
-                      type="text" 
-                      bind:value={searchQuery}
-                      placeholder="ค้นหาจาก ID, ประเภทสินค้า..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                    />
-                    {#if searchQuery}
-                      <button 
-                        on:click={() => searchQuery = ''}
-                        class="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
-                        title="ล้างการค้นหา"
-                      >
-                        <span class="text-lg">✕</span>
-                      </button>
-                    {/if}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Filter Results Info -->
-            <div class="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
-              <span>แสดงผล: <strong class="text-pink-600">{filteredInvestments.length}</strong> จาก <strong>{investments.length}</strong> รายการ</span>
-              {#if filterStatus !== 'all'}
-                <span class="bg-pink-100 text-pink-800 px-2 py-1 rounded-full">
-                  สถานะ: {filterStatus === 'active' ? 'กำลังดำเนินการ' : filterStatus === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิก'}
-                </span>
-              {/if}
-              {#if searchQuery.trim()}
-                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  ค้นหา: "{searchQuery}"
-                </span>
-              {/if}
-            </div>
-          </div>
-          
-          <div class="flex items-center justify-between">
-            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <span class="text-2xl">📋</span>
-              การลงทุนทั้งหมด ({filteredInvestments.length})
-            </h2>
-          </div>
-          
-          {#each filteredInvestments as investment (investment.id)}
-            <div class="bg-white rounded-lg shadow-lg border border-pink-200 p-6 {investment.status === 'active' ? 'border-l-4 border-l-green-500' : investment.status === 'completed' ? 'border-l-4 border-l-blue-500' : 'border-l-4 border-l-gray-400'}">
-              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4">
-                <div class="mb-2 lg:mb-0">
-                  <h4 class="text-lg font-semibold text-gray-800">
-                    {investment.product_type || 'การลงทุน'} #{investment.id}
-                    {#if investment.supplier}
-                      <small class="text-sm text-gray-500 font-normal">จาก {investment.supplier}</small>
-                    {/if}
-                  </h4>
-                </div>
-                <div>
-                  <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {
-                    investment.status === 'active' ? 'bg-green-100 text-green-800' :
-                    investment.status === 'completed' ? 'bg-blue-100 text-blue-800' : 
-                    'bg-gray-100 text-gray-800'
-                  }">{
-                    investment.status === 'active' ? 'กำลังดำเนินการ' :
-                    investment.status === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิก'
-                  }</span>
-                </div>
-              </div>
-              
-              <!-- Progress Bar -->
-              {#if investment.status === 'active' && investment.expected_return}
-                <div class="mb-4">
-                  <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
-                    <div class="bg-gradient-to-r from-pink-400 to-pink-600 h-3 rounded-full transition-all duration-300" style="width: {calculateProgress(investment)}%"></div>
-                  </div>
-                  <span class="text-sm text-gray-600">
-                    ได้รับแล้ว {calculateProgress(investment)}% 
-                    ({(investment.current_received || 0).toLocaleString()}/{investment.expected_return.toLocaleString()} บาท)
-                  </span>
-                </div>
-              {/if}
-              
-              <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span class="text-2xl">💰</span>
-                    <div>
-                      <span class="block text-sm text-gray-600">เงินลงทุน</span>
-                      <span class="font-semibold text-gray-800">{parseFloat(investment.amount).toLocaleString()} บาท</span>
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span class="text-2xl">💵</span>
-                    <div class="flex-1">
-                      <span class="block text-sm text-gray-600">ได้รับแล้ว</span>
-                      <div class="flex items-center gap-2">
-                        <span class="font-semibold text-green-600">{(investment.current_received || 0).toLocaleString()} บาท</span>
-                        <button class="bg-pink-500 hover:bg-pink-600 text-white text-xs px-2 py-1 rounded transition-colors" on:click={() => quickUpdateReceived(investment)}>+เพิ่ม</button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span class="text-2xl">🎯</span>
-                    <div>
-                      <span class="block text-sm text-gray-600">เป้าหมาย</span>
-                      <span class="font-semibold text-gray-800">
-                        {investment.expected_return ? parseFloat(investment.expected_return).toLocaleString() + ' บาท' : 'ไม่ระบุ'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span class="text-2xl">📈</span>
-                    <div>
-                      <span class="block text-sm text-gray-600">ROI ปัจจุบัน</span>
-                      <span class="font-semibold">
-                        {#if calculateROI(investment)}
-                          <span class="{parseFloat(calculateROI(investment) || '0') >= 0 ? 'text-green-600' : 'text-red-600'}">
-                            {calculateROI(investment)}%
-                          </span>
-                        {:else}
-                          <span class="text-gray-500">ยังไม่มีข้อมูล</span>
-                        {/if}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span class="text-2xl">📅</span>
-                    <div>
-                      <span class="block text-sm text-gray-600">วันที่เริ่ม</span>
-                      <span class="font-semibold text-gray-800">{investment.start_date}</span>
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span class="text-2xl">⏱️</span>
-                    <div>
-                      <span class="block text-sm text-gray-600">ระยะเวลาที่ผ่านมา</span>
-                      <span class="font-semibold text-gray-800">{calculateDaysRunning(investment.start_date)} วัน</span>
-                    </div>
-                  </div>
-                  
-                  {#if investment.end_date}
-                    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <span class="text-2xl">🏁</span>
-                      <div>
-                        <span class="block text-sm text-gray-600">วันที่สิ้นสุด</span>
-                        <span class="font-semibold text-gray-800">{investment.end_date}</span>
-                      </div>
-                    </div>
-                    
-                    {#if investment.status === 'active'}
-                      <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <span class="text-2xl">⏰</span>
-                        <div>
-                          <span class="block text-sm text-gray-600">เหลืออีก</span>
-                          <span class="font-semibold {calculateDaysLeft(investment.end_date) !== null && calculateDaysLeft(investment.end_date)! < 0 ? 'text-red-600' : 'text-gray-800'}">
-                            {calculateDaysLeft(investment.end_date)} วัน
-                          </span>
-                        </div>
-                      </div>
-                    {/if}
-                  {/if}
-                  
-                  {#if investment.customer}
-                    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <span class="text-2xl">🛒</span>
-                      <div>
-                        <span class="block text-sm text-gray-600">ช่องทางขาย</span>
-                        <span class="font-semibold text-gray-800">{investment.customer}</span>
-                      </div>
-                    </div>
-                  {/if}
-                  
-                  {#if investment.profit_margin}
-                    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <span class="text-2xl">📊</span>
-                      <div>
-                        <span class="block text-sm text-gray-600">กำไรคาดหวัง</span>
-                        <span class="font-semibold text-gray-800">{investment.profit_margin}%</span>
-                      </div>
-                    </div>
-                  {/if}
-                </div>
-                
-                {#if investment.notes}
-                  <div class="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <span class="text-2xl mt-1">📝</span>
-                    <div>
-                      <span class="block text-sm font-medium text-amber-800 mb-1">หมายเหตุ:</span>
-                      <span class="text-amber-700">{investment.notes}</span>
-                    </div>
-                  </div>
-                {/if}
-              </div>
-              
-              <div class="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
-                <button class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => startEdit(investment)}>
-                  <span class="text-lg">✏️</span>
-                  แก้ไข
-                </button>
-                
-                {#if investment.status === 'active'}
-                  <button class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => updateInvestmentStatus(investment.id, 'completed')}>
-                    <span class="text-lg">✅</span>
-                    เสร็จสิ้น
-                  </button>
-                  <button class="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => updateInvestmentStatus(investment.id, 'cancelled')}>
-                    <span class="text-lg">❌</span>
-                    ยกเลิก
-                  </button>
-                {:else if investment.status === 'completed' || investment.status === 'cancelled'}
-                  <button class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => updateInvestmentStatus(investment.id, 'active')}>
-                    <span class="text-lg">🔄</span>
-                    เปิดใหม่
-                  </button>
-                {/if}
-                
-                <button class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => deleteInvestment(investment.id)}>
-                  <span class="text-lg">🗑️</span>
-                  ลบ
-                </button>
-              </div>
-            </div>
-          {/each}
-          
-          {#if filteredInvestments.length === 0}
-            <div class="flex flex-col items-center justify-center py-16 bg-white rounded-lg shadow-lg border border-pink-200">
-              {#if investments.length === 0}
-                <div class="text-6xl mb-4">💼</div>
-                <h3 class="text-2xl font-bold text-gray-800 mb-2">ยังไม่มีการลงทุน</h3>
-                <p class="text-gray-600 mb-6">เริ่มต้นติดตามการลงทุนของคุณวันนี้</p>
-                <button class="bg-pink-500 hover:bg-pink-600 text-white font-medium py-3 px-6 rounded-md transition-colors duration-200 flex items-center gap-2" on:click={() => {
-                  showAddForm = true
-                  resetForm()
-                }}>
-                  <span class="text-lg">➕</span>
-                  เพิ่มการลงทุนแรก
-                </button>
-              {:else}
-                <div class="text-6xl mb-4">🔍</div>
-                <h3 class="text-2xl font-bold text-gray-800 mb-2">ไม่พบข้อมูลที่ค้นหา</h3>
-                <p class="text-gray-600 mb-6">ลองเปลี่ยนคำค้นหาหรือสถานะที่กรอง</p>
-                <div class="flex gap-2">
-                  <button 
-                    class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
-                    on:click={() => searchQuery = ''}
-                  >
-                    ล้างการค้นหา
-                  </button>
-                  <button 
-                    class="bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
-                    on:click={() => { filterStatus = 'all'; searchQuery = '' }}
-                  >
-                    รีเซ็ตตัวกรอง
-                  </button>
-                </div>
-              {/if}
-            </div>
-          {/if}
-        </section>
-      {/if}
-    </div>
-  </main>
+								<div class="space-y-2">
+									<label for="expected_return" class="block text-sm font-medium text-gray-700"
+										>ผลตอบแทนที่คาดหวัง (บาท)</label
+									>
+									<input
+										type="number"
+										id="expected_return"
+										bind:value={formData.expected_return}
+										placeholder="9600"
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
 
-  <!-- Footer -->
-  <footer class="bg-gradient-to-r from-pink-300 to-pink-500 text-white py-8 text-center">
-    <div class="max-w-6xl mx-auto px-4">
-      <h2 class="text-lg font-semibold mb-2">This Website was made by Chulinxz, feel free to contact me anytime :D</h2>
-      <p class="opacity-90">© Chulinx Folio, All Right Reserved | Implemented by Svelte+Supabase</p>
-    </div>
-  </footer>
+								<div class="space-y-2">
+									<label for="current_received" class="block text-sm font-medium text-gray-700"
+										>เงินที่ได้รับแล้ว (บาท)</label
+									>
+									<input
+										type="number"
+										id="current_received"
+										bind:value={formData.current_received}
+										placeholder="0"
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
 
-<!-- Transaction History Modal -->
-{#if showTransactionHistory}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" on:click={closeTransactionHistory}>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" on:click|stopPropagation={() => {}}>
+								<div class="space-y-2">
+									<label for="status" class="block text-sm font-medium text-gray-700">สถานะ</label>
+									<select
+										id="status"
+										bind:value={formData.status}
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									>
+										<option value="active">กำลังดำเนินการ</option>
+										<option value="completed">เสร็จสิ้น</option>
+										<option value="cancelled">ยกเลิก</option>
+									</select>
+								</div>
 
-      <!-- Modal Header -->
-      <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
-        <div class="flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold flex items-center gap-2">
-              <span>📜</span>
-              ประวัติธุรกรรม
-            </h2>
-            <p class="text-indigo-100 mt-1">
-              {#if selectedInvestmentForLogs}
-                การลงทุน #{selectedInvestmentForLogs}
-              {:else}
-                ธุรกรรมทั้งหมด ({transactionLogs.length} รายการ)
-              {/if}
-            </p>
-          </div>
-          <button 
-            class="text-white hover:text-indigo-200 transition-colors p-2"
-            on:click={closeTransactionHistory}
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Modal Body -->
-      <div class="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-        {#if transactionLoading}
-          <div class="flex items-center justify-center py-12">
-            <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
-          </div>
-        {:else if transactionLogs.length === 0}
-          <div class="text-center py-12">
-            <div class="text-6xl mb-4">📭</div>
-            <h3 class="text-xl font-bold text-gray-700 mb-2">ยังไม่มีประวัติธุรกรรม</h3>
-            <p class="text-gray-500">เริ่มสร้างการลงทุนใหม่เพื่อดูประวัติที่นี่</p>
-          </div>
-        {:else}
-          <!-- View Mode Toggle -->
-          <div class="flex justify-end mb-4">
-            <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1">
-              <button 
-                class="px-4 py-2 text-sm font-medium rounded-md transition-colors {transactionViewMode === 'card' ? 'bg-indigo-500 text-white' : 'text-gray-600 hover:text-gray-800'}"
-                on:click={() => transactionViewMode = 'card'}
-              >
-                <span class="mr-1">🃏</span> Card
-              </button>
-              <button 
-                class="px-4 py-2 text-sm font-medium rounded-md transition-colors {transactionViewMode === 'table' ? 'bg-indigo-500 text-white' : 'text-gray-600 hover:text-gray-800'}"
-                on:click={() => transactionViewMode = 'table'}
-              >
-                <span class="mr-1">📋</span> Table
-              </button>
-            </div>
-          </div>
+								<div class="space-y-2">
+									<label for="product_type" class="block text-sm font-medium text-gray-700"
+										>ประเภทสินค้า</label
+									>
+									<input
+										type="text"
+										id="product_type"
+										bind:value={formData.product_type}
+										placeholder="เสื้อผ้า, อิเล็กทรอนิกส์, ของเล่น..."
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
 
-          <!-- Card View -->
-          {#if transactionViewMode === 'card'}
-            <div class="space-y-4">
-              {#each transactionLogs as log}
-                {@const typeInfo = formatTransactionType(log.type)}
-                <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-shadow">
-                  <div class="flex items-start justify-between gap-4">
-                    <!-- Left: Icon & Type -->
-                    <div class="flex items-center gap-3">
-                      <div class="w-12 h-12 rounded-full {typeInfo.bg} flex items-center justify-center text-2xl">
-                        {typeInfo.icon}
-                      </div>
-                      <div>
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium {typeInfo.bg} {typeInfo.color}">
-                          {typeInfo.label}
-                        </span>
-                        <p class="text-gray-500 text-sm mt-1">
-                          {formatDate(log.transaction_date)}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <!-- Right: Amount -->
-                    <div class="text-right">
-                      <p class="text-xl font-bold {log.amount >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        {log.amount >= 0 ? '+' : ''}{formatCurrency(log.amount)} บาท
-                      </p>
-                      {#if log.type !== 'initial_investment'}
-                        <p class="text-sm text-gray-500">
-                          ยอดรวม: {formatCurrency(log.balance_after)} บาท
-                        </p>
-                      {/if}
-                    </div>
-                  </div>
-                  
-                  <!-- Details -->
-                  <div class="mt-3 pt-3 border-t border-gray-200">
-                    <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                      {#if log.investments}
-                        <div class="flex items-center gap-1">
-                          <span class="text-gray-500">🏷️ การลงทุน:</span>
-                          <span class="font-medium">
-                            {log.investments.product_type || `#${log.investment_id}`}
-                          </span>
-                        </div>
-                        {#if log.investments.supplier}
-                          <div class="flex items-center gap-1">
-                            <span class="text-gray-500">🏭 Supplier:</span>
-                            <span class="font-medium">{log.investments.supplier}</span>
-                          </div>
-                        {/if}
-                        {#if log.investments.customer}
-                          <div class="flex items-center gap-1">
-                            <span class="text-gray-500">🛒 Customer:</span>
-                            <span class="font-medium">{log.investments.customer}</span>
-                          </div>
-                        {/if}
-                      {/if}
-                    </div>
-                    {#if log.notes}
-                      <p class="mt-2 text-gray-600 text-sm">
-                        💬 {log.notes}
-                      </p>
-                    {/if}
-                    {#if log.type !== 'initial_investment'}
-                      <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                        <span>ก่อน: {formatCurrency(log.balance_before)} บาท</span>
-                        <span>→</span>
-                        <span>หลัง: {formatCurrency(log.balance_after)} บาท</span>
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <!-- Table View -->
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-[800px]">
-                <thead class="bg-gray-100 sticky top-0">
-                  <tr>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">วันที่</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ประเภท</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">การลงทุน</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">จำนวนเงิน</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">ยอดก่อน</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">ยอดหลัง</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">หมายเหตุ</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                  {#each transactionLogs as log, index}
-                    {@const typeInfo = formatTransactionType(log.type)}
-                    <tr class="hover:bg-gray-50 transition-colors {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
-                      <!-- วันที่ -->
-                      <td class="px-4 py-3 whitespace-nowrap">
-                        <div class="text-sm text-gray-900">{formatDate(log.transaction_date)}</div>
-                      </td>
-                      
-                      <!-- ประเภท -->
-                      <td class="px-4 py-3 whitespace-nowrap">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium {typeInfo.bg} {typeInfo.color}">
-                          <span>{typeInfo.icon}</span>
-                          {typeInfo.label}
-                        </span>
-                      </td>
-                      
-                      <!-- การลงทุน -->
-                      <td class="px-4 py-3">
-                        <div class="text-sm font-medium text-gray-900">
-                          {log.investments?.product_type || `#${log.investment_id}`}
-                        </div>
-                        {#if log.investments?.supplier || log.investments?.customer}
-                          <div class="text-xs text-gray-500">
-                            {#if log.investments?.supplier}
-                              <span>🏭 {log.investments.supplier}</span>
-                            {/if}
-                            {#if log.investments?.supplier && log.investments?.customer}
-                              <span class="mx-1">•</span>
-                            {/if}
-                            {#if log.investments?.customer}
-                              <span>🛒 {log.investments.customer}</span>
-                            {/if}
-                          </div>
-                        {/if}
-                      </td>
-                      
-                      <!-- จำนวนเงิน -->
-                      <td class="px-4 py-3 text-right whitespace-nowrap">
-                        <span class="text-sm font-bold {log.amount >= 0 ? 'text-green-600' : 'text-red-600'}">
-                          {log.amount >= 0 ? '+' : ''}{formatCurrency(log.amount)}
-                        </span>
-                      </td>
-                      
-                      <!-- ยอดก่อน -->
-                      <td class="px-4 py-3 text-right whitespace-nowrap">
-                        <span class="text-sm text-gray-600">
-                          {log.type === 'initial_investment' ? '-' : formatCurrency(log.balance_before)}
-                        </span>
-                      </td>
-                      
-                      <!-- ยอดหลัง -->
-                      <td class="px-4 py-3 text-right whitespace-nowrap">
-                        <span class="text-sm text-gray-600">
-                          {log.type === 'initial_investment' ? '-' : formatCurrency(log.balance_after)}
-                        </span>
-                      </td>
-                      
-                      <!-- หมายเหตุ -->
-                      <td class="px-4 py-3">
-                        <div class="text-sm text-gray-600 max-w-[200px] truncate" title={log.notes || ''}>
-                          {log.notes || '-'}
-                        </div>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          {/if}
-        {/if}
-      </div>
-      
-      <!-- Modal Footer -->
-      <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
-        <div class="flex justify-between items-center">
-          <div class="text-sm text-gray-500">
-            {#if transactionLogs.length > 0}
-              แสดง {transactionLogs.length} รายการ
-            {/if}
-          </div>
-          <button 
-            class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition-colors"
-            on:click={closeTransactionHistory}
-          >
-            ปิด
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
-</div>
+								<div class="space-y-2">
+									<label for="supplier" class="block text-sm font-medium text-gray-700"
+										>ซัพพลายเออร์/แหล่งซื้อ</label
+									>
+									<input
+										type="text"
+										id="supplier"
+										bind:value={formData.supplier}
+										placeholder="ชื่อร้าน, ผู้ผลิต..."
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
+
+								<div class="space-y-2">
+									<label for="customer" class="block text-sm font-medium text-gray-700"
+										>ลูกค้า/ช่องทางขาย</label
+									>
+									<input
+										type="text"
+										id="customer"
+										bind:value={formData.customer}
+										placeholder="Facebook, Shopee, ลูกค้าเก่า..."
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
+
+								<div class="space-y-2">
+									<label for="profit_margin" class="block text-sm font-medium text-gray-700"
+										>เปอร์เซ็นต์กำไรที่คาดหวัง (%)</label
+									>
+									<input
+										type="number"
+										id="profit_margin"
+										bind:value={formData.profit_margin}
+										placeholder="20"
+										step="0.01"
+										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									/>
+								</div>
+
+								<div class="space-y-2 md:col-span-2">
+									<label for="notes" class="block text-sm font-medium text-gray-700"
+										>หมายเหตุ/รายละเอียด</label
+									>
+									<textarea
+										id="notes"
+										bind:value={formData.notes}
+										placeholder="พรีออร์เดอร์ของใหม่, ข้อมูลเพิ่มเติม..."
+										class="min-h-[80px] w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+									></textarea>
+								</div>
+							</div>
+
+							<div class="flex flex-col gap-3 pt-4 sm:flex-row">
+								<button
+									class="flex flex-1 items-center justify-center gap-2 rounded-md bg-pink-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-pink-600"
+									on:click={addInvestment}
+								>
+									<span class="text-lg">💾</span>
+									บันทึก
+								</button>
+								<button
+									class="flex flex-1 items-center justify-center gap-2 rounded-md bg-gray-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-gray-600"
+									on:click={() => {
+										showAddForm = false;
+										resetForm();
+									}}
+								>
+									<span class="text-lg">❌</span>
+									ยกเลิก
+								</button>
+							</div>
+						</div>
+					</section>
+				{/if}
+
+				<!-- Received Amount Modal -->
+				{#if showReceivedModal && modalInvestment}
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+					<div
+						class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+						on:click={closeReceivedModal}
+						role="dialog"
+						aria-modal="true"
+					>
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+						<div
+							class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl"
+							on:click|stopPropagation={() => {}}
+							role="document"
+						>
+							<div class="flex items-center justify-between border-b border-gray-200 p-6">
+								<h3 class="flex items-center gap-2 text-xl font-bold text-gray-800">
+									<span class="text-2xl">💰</span>
+									เพิ่มเงินที่ได้รับ
+								</h3>
+								<button
+									class="flex h-8 w-8 items-center justify-center rounded-full text-2xl font-bold text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+									on:click={closeReceivedModal}
+								>
+									<span>✕</span>
+								</button>
+							</div>
+
+							<div class="space-y-6 p-6">
+								<div class="rounded-lg border border-pink-200 bg-pink-50 p-4">
+									<h4 class="mb-3 font-semibold text-gray-800">
+										{modalInvestment.product_type || 'การลงทุน'} #{modalInvestment.id}
+									</h4>
+									<div class="space-y-2">
+										<div class="flex items-center justify-between">
+											<span class="text-sm text-gray-600">เงินลงทุน:</span>
+											<span class="font-medium text-gray-800"
+												>{parseFloat(modalInvestment.amount).toLocaleString()} บาท</span
+											>
+										</div>
+										<div class="flex items-center justify-between">
+											<span class="text-sm text-gray-600">ได้รับแล้ว:</span>
+											<span class="font-medium text-green-600"
+												>{(modalInvestment.current_received || 0).toLocaleString()} บาท</span
+											>
+										</div>
+										{#if modalInvestment.expected_return}
+											<div class="flex items-center justify-between">
+												<span class="text-sm text-gray-600">เป้าหมาย:</span>
+												<span class="font-medium text-blue-600"
+													>{parseFloat(modalInvestment.expected_return).toLocaleString()} บาท</span
+												>
+											</div>
+										{/if}
+									</div>
+								</div>
+
+								<div class="space-y-4">
+									<div class="space-y-2">
+										<label for="received-amount" class="block text-sm font-medium text-gray-700"
+											>จำนวนเงินที่ได้รับเพิ่มเติม (บาท)</label
+										>
+										<!-- svelte-ignore a11y-autofocus -->
+										<input
+											type="number"
+											id="received-amount"
+											bind:value={receivedAmount}
+											placeholder="เช่น 2000"
+											step="0.01"
+											min="0"
+											autofocus
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									{#if receivedAmount && !isNaN(parseFloat(receivedAmount))}
+										<div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+											<div class="space-y-2 text-sm">
+												<div class="flex items-center justify-between">
+													<span>ได้รับแล้ว:</span>
+													<span class="font-medium"
+														>{(modalInvestment.current_received || 0).toLocaleString()} บาท</span
+													>
+												</div>
+												<div class="flex items-center justify-between text-green-600">
+													<span>+ เพิ่มเติม:</span>
+													<span class="font-medium"
+														>{parseFloat(receivedAmount).toLocaleString()} บาท</span
+													>
+												</div>
+												<div
+													class="flex items-center justify-between border-t border-gray-300 pt-2 text-lg font-semibold"
+												>
+													<span>= รวม:</span>
+													<span class="text-pink-600"
+														>{(
+															(modalInvestment.current_received || 0) + parseFloat(receivedAmount)
+														).toLocaleString()} บาท</span
+													>
+												</div>
+											</div>
+										</div>
+									{/if}
+								</div>
+							</div>
+
+							<div class="flex flex-col gap-3 border-t border-gray-200 p-6 sm:flex-row">
+								<button
+									class="flex flex-1 items-center justify-center gap-2 rounded-md bg-gray-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-gray-600"
+									on:click={closeReceivedModal}
+								>
+									<span class="text-lg">❌</span>
+									ยกเลิก
+								</button>
+								<button
+									class="flex flex-1 items-center justify-center gap-2 rounded-md bg-pink-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-pink-600 disabled:cursor-not-allowed disabled:bg-gray-300"
+									on:click={updateReceivedAmount}
+									disabled={!receivedAmount ||
+										isNaN(parseFloat(receivedAmount)) ||
+										parseFloat(receivedAmount) <= 0}
+								>
+									<span class="text-lg">💾</span>
+									บันทึก
+								</button>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Edit Investment Modal -->
+				{#if showEditModal && editModalInvestment}
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+					<div
+						class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+						on:click={closeEditModal}
+						role="dialog"
+						aria-modal="true"
+					>
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+						<div
+							class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl"
+							on:click|stopPropagation={() => {}}
+							role="document"
+						>
+							<div class="flex items-center justify-between border-b border-gray-200 p-6">
+								<h3 class="flex items-center gap-2 text-xl font-bold text-gray-800">
+									<span class="text-2xl">✏️</span>
+									แก้ไขการลงทุน
+								</h3>
+								<button
+									class="flex h-8 w-8 items-center justify-center rounded-full text-2xl font-bold text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+									on:click={closeEditModal}>×</button
+								>
+							</div>
+
+							<div class="p-6">
+								<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+									<div class="space-y-2">
+										<label for="edit-amount" class="block text-sm font-medium text-gray-700"
+											>จำนวนเงินลงทุน (บาท) *</label
+										>
+										<input
+											id="edit-amount"
+											type="number"
+											bind:value={formData.amount}
+											required
+											min="1"
+											placeholder="เช่น 10000"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-start-date" class="block text-sm font-medium text-gray-700"
+											>วันที่เริ่มลงทุน *</label
+										>
+										<input
+											id="edit-start-date"
+											type="date"
+											bind:value={formData.start_date}
+											required
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-end-date" class="block text-sm font-medium text-gray-700"
+											>วันที่คาดหวังคืนทุน</label
+										>
+										<input
+											id="edit-end-date"
+											type="date"
+											bind:value={formData.end_date}
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label
+											for="edit-expected-return"
+											class="block text-sm font-medium text-gray-700"
+											>ผลตอบแทนที่คาดหวัง (บาท)</label
+										>
+										<input
+											id="edit-expected-return"
+											type="number"
+											bind:value={formData.expected_return}
+											min="0"
+											placeholder="เช่น 12000"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label
+											for="edit-current-received"
+											class="block text-sm font-medium text-gray-700">เงินที่ได้รับแล้ว (บาท)</label
+										>
+										<input
+											id="edit-current-received"
+											type="number"
+											bind:value={formData.current_received}
+											min="0"
+											placeholder="เช่น 5000"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-status" class="block text-sm font-medium text-gray-700"
+											>สถานะ</label
+										>
+										<select
+											id="edit-status"
+											bind:value={formData.status}
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										>
+											<option value="active">กำลังดำเนินการ</option>
+											<option value="completed">เสร็จสิ้น</option>
+											<option value="cancelled">ยกเลิก</option>
+										</select>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-product-type" class="block text-sm font-medium text-gray-700"
+											>ประเภทสินค้า</label
+										>
+										<input
+											id="edit-product-type"
+											type="text"
+											bind:value={formData.product_type}
+											placeholder="เช่น เสื้อผ้า, อิเล็กทรอนิกส์"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-supplier" class="block text-sm font-medium text-gray-700"
+											>ซัพพลายเออร์</label
+										>
+										<input
+											id="edit-supplier"
+											type="text"
+											bind:value={formData.supplier}
+											placeholder="เช่น บริษัท ABC"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-customer" class="block text-sm font-medium text-gray-700"
+											>ลูกค้า/แพลตฟอร์ม</label
+										>
+										<input
+											id="edit-customer"
+											type="text"
+											bind:value={formData.customer}
+											placeholder="เช่น Facebook, Shopee, Lazada"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="edit-profit-margin" class="block text-sm font-medium text-gray-700"
+											>กำไรต่อหน่วย (%)</label
+										>
+										<input
+											id="edit-profit-margin"
+											type="number"
+											bind:value={formData.profit_margin}
+											min="0"
+											step="0.01"
+											placeholder="เช่น 15.5"
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										/>
+									</div>
+
+									<div class="space-y-2 md:col-span-2">
+										<label for="edit-notes" class="block text-sm font-medium text-gray-700"
+											>หมายเหตุ</label
+										>
+										<textarea
+											id="edit-notes"
+											bind:value={formData.notes}
+											placeholder="พรีออร์เดอร์ของใหม่, ข้อมูลเพิ่มเติม..."
+											class="min-h-[80px] w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+										></textarea>
+									</div>
+								</div>
+							</div>
+
+							<div class="flex flex-col gap-3 border-t border-gray-200 p-6 sm:flex-row">
+								<button
+									class="flex flex-1 items-center justify-center gap-2 rounded-md bg-gray-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-gray-600"
+									on:click={closeEditModal}
+								>
+									<span class="text-lg">❌</span>
+									ยกเลิก
+								</button>
+								<button
+									class="flex flex-1 items-center justify-center gap-2 rounded-md bg-pink-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-pink-600"
+									on:click={updateInvestment}
+								>
+									<span class="text-lg">💾</span>
+									บันทึกการแก้ไข
+								</button>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Investments List -->
+				{#if loading}
+					<section
+						class="flex flex-col items-center justify-center rounded-lg border border-pink-200 bg-white py-12 shadow-lg"
+					>
+						<div class="h-12 w-12 animate-spin rounded-full border-b-2 border-pink-500"></div>
+						<p class="mt-4 font-medium text-gray-600">กำลังโหลดข้อมูล...</p>
+					</section>
+				{:else}
+					<section class="space-y-6">
+						<!-- Filter Section -->
+						<div class="rounded-lg border border-pink-200 bg-white p-6 shadow-lg">
+							<div class="flex flex-col gap-4">
+								<!-- Header -->
+								<div class="flex items-center gap-2 text-lg font-medium text-gray-700">
+									<span>🔍</span>
+									<span>กรองและค้นหา</span>
+								</div>
+
+								<!-- Filters Container -->
+								<div class="flex flex-col gap-4 sm:flex-row">
+									<!-- Status Filter -->
+									<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+										<label
+											for="status-filter"
+											class="whitespace-nowrap text-sm font-medium text-gray-600">สถานะ:</label
+										>
+										<select
+											id="status-filter"
+											bind:value={filterStatus}
+											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500 sm:w-auto"
+										>
+											<option value="all">ทั้งหมด</option>
+											<option value="active">กำลังดำเนินการ</option>
+											<option value="completed">เสร็จสิ้น</option>
+											<option value="cancelled">ยกเลิก</option>
+										</select>
+									</div>
+
+									<!-- Search Input -->
+									<div class="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+										<label
+											for="search-input"
+											class="whitespace-nowrap text-sm font-medium text-gray-600">ค้นหา:</label
+										>
+										<div class="flex flex-1 items-center gap-2">
+											<input
+												id="search-input"
+												type="text"
+												bind:value={searchQuery}
+												placeholder="ค้นหาจาก ID, ประเภทสินค้า..."
+												class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+											/>
+											{#if searchQuery}
+												<button
+													on:click={() => (searchQuery = '')}
+													class="flex-shrink-0 px-3 py-2 text-gray-500 transition-colors hover:text-gray-700"
+													title="ล้างการค้นหา"
+												>
+													<span class="text-lg">✕</span>
+												</button>
+											{/if}
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Filter Results Info -->
+							<div class="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
+								<span
+									>แสดงผล: <strong class="text-pink-600">{filteredInvestments.length}</strong> จาก
+									<strong>{investments.length}</strong> รายการ</span
+								>
+								{#if filterStatus !== 'all'}
+									<span class="rounded-full bg-pink-100 px-2 py-1 text-pink-800">
+										สถานะ: {filterStatus === 'active'
+											? 'กำลังดำเนินการ'
+											: filterStatus === 'completed'
+												? 'เสร็จสิ้น'
+												: 'ยกเลิก'}
+									</span>
+								{/if}
+								{#if searchQuery.trim()}
+									<span class="rounded-full bg-blue-100 px-2 py-1 text-blue-800">
+										ค้นหา: "{searchQuery}"
+									</span>
+								{/if}
+							</div>
+						</div>
+
+						<div class="flex items-center justify-between">
+							<h2 class="flex items-center gap-2 text-2xl font-bold text-gray-800">
+								<span class="text-2xl">📋</span>
+								การลงทุนทั้งหมด ({filteredInvestments.length})
+							</h2>
+						</div>
+
+						{#each filteredInvestments as investment (investment.id)}
+							<div
+								class="rounded-lg border border-pink-200 bg-white p-6 shadow-lg {investment.status ===
+								'active'
+									? 'border-l-4 border-l-green-500'
+									: investment.status === 'completed'
+										? 'border-l-4 border-l-blue-500'
+										: 'border-l-4 border-l-gray-400'}"
+							>
+								<div class="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between">
+									<div class="mb-2 lg:mb-0">
+										<h4 class="text-lg font-semibold text-gray-800">
+											{investment.product_type || 'การลงทุน'} #{investment.id}
+											{#if investment.supplier}
+												<small class="text-sm font-normal text-gray-500"
+													>จาก {investment.supplier}</small
+												>
+											{/if}
+										</h4>
+									</div>
+									<div>
+										<span
+											class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium {investment.status ===
+											'active'
+												? 'bg-green-100 text-green-800'
+												: investment.status === 'completed'
+													? 'bg-blue-100 text-blue-800'
+													: 'bg-gray-100 text-gray-800'}"
+											>{investment.status === 'active'
+												? 'กำลังดำเนินการ'
+												: investment.status === 'completed'
+													? 'เสร็จสิ้น'
+													: 'ยกเลิก'}</span
+										>
+									</div>
+								</div>
+
+								<!-- Progress Bar -->
+								{#if investment.status === 'active' && investment.expected_return}
+									<div class="mb-4">
+										<div class="mb-2 h-3 w-full rounded-full bg-gray-200">
+											<div
+												class="h-3 rounded-full bg-gradient-to-r from-pink-400 to-pink-600 transition-all duration-300"
+												style="width: {calculateProgress(investment)}%"
+											></div>
+										</div>
+										<span class="text-sm text-gray-600">
+											ได้รับแล้ว {calculateProgress(investment)}% ({(
+												investment.current_received || 0
+											).toLocaleString()}/{investment.expected_return.toLocaleString()} บาท)
+										</span>
+									</div>
+								{/if}
+
+								<div class="space-y-4">
+									<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+										<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+											<span class="text-2xl">💰</span>
+											<div>
+												<span class="block text-sm text-gray-600">เงินลงทุน</span>
+												<span class="font-semibold text-gray-800"
+													>{parseFloat(investment.amount).toLocaleString()} บาท</span
+												>
+											</div>
+										</div>
+
+										<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+											<span class="text-2xl">💵</span>
+											<div class="flex-1">
+												<span class="block text-sm text-gray-600">ได้รับแล้ว</span>
+												<div class="flex items-center gap-2">
+													<span class="font-semibold text-green-600"
+														>{(investment.current_received || 0).toLocaleString()} บาท</span
+													>
+													<button
+														class="rounded bg-pink-500 px-2 py-1 text-xs text-white transition-colors hover:bg-pink-600"
+														on:click={() => quickUpdateReceived(investment)}>+เพิ่ม</button
+													>
+												</div>
+											</div>
+										</div>
+
+										<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+											<span class="text-2xl">🎯</span>
+											<div>
+												<span class="block text-sm text-gray-600">เป้าหมาย</span>
+												<span class="font-semibold text-gray-800">
+													{investment.expected_return
+														? parseFloat(investment.expected_return).toLocaleString() + ' บาท'
+														: 'ไม่ระบุ'}
+												</span>
+											</div>
+										</div>
+
+										<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+											<span class="text-2xl">📈</span>
+											<div>
+												<span class="block text-sm text-gray-600">ROI ปัจจุบัน</span>
+												<span class="font-semibold">
+													{#if calculateROI(investment)}
+														<span
+															class={parseFloat(calculateROI(investment) || '0') >= 0
+																? 'text-green-600'
+																: 'text-red-600'}
+														>
+															{calculateROI(investment)}%
+														</span>
+													{:else}
+														<span class="text-gray-500">ยังไม่มีข้อมูล</span>
+													{/if}
+												</span>
+											</div>
+										</div>
+
+										<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+											<span class="text-2xl">📅</span>
+											<div>
+												<span class="block text-sm text-gray-600">วันที่เริ่ม</span>
+												<span class="font-semibold text-gray-800">{investment.start_date}</span>
+											</div>
+										</div>
+
+										<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+											<span class="text-2xl">⏱️</span>
+											<div>
+												<span class="block text-sm text-gray-600">ระยะเวลาที่ผ่านมา</span>
+												<span class="font-semibold text-gray-800"
+													>{calculateDaysRunning(investment.start_date)} วัน</span
+												>
+											</div>
+										</div>
+
+										{#if investment.end_date}
+											<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+												<span class="text-2xl">🏁</span>
+												<div>
+													<span class="block text-sm text-gray-600">วันที่สิ้นสุด</span>
+													<span class="font-semibold text-gray-800">{investment.end_date}</span>
+												</div>
+											</div>
+
+											{#if investment.status === 'active'}
+												<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+													<span class="text-2xl">⏰</span>
+													<div>
+														<span class="block text-sm text-gray-600">เหลืออีก</span>
+														<span
+															class="font-semibold {calculateDaysLeft(investment.end_date) !==
+																null && calculateDaysLeft(investment.end_date)! < 0
+																? 'text-red-600'
+																: 'text-gray-800'}"
+														>
+															{calculateDaysLeft(investment.end_date)} วัน
+														</span>
+													</div>
+												</div>
+											{/if}
+										{/if}
+
+										{#if investment.customer}
+											<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+												<span class="text-2xl">🛒</span>
+												<div>
+													<span class="block text-sm text-gray-600">ช่องทางขาย</span>
+													<span class="font-semibold text-gray-800">{investment.customer}</span>
+												</div>
+											</div>
+										{/if}
+
+										{#if investment.profit_margin}
+											<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+												<span class="text-2xl">📊</span>
+												<div>
+													<span class="block text-sm text-gray-600">กำไรคาดหวัง</span>
+													<span class="font-semibold text-gray-800"
+														>{investment.profit_margin}%</span
+													>
+												</div>
+											</div>
+										{/if}
+									</div>
+
+									{#if investment.notes}
+										<div
+											class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4"
+										>
+											<span class="mt-1 text-2xl">📝</span>
+											<div>
+												<span class="mb-1 block text-sm font-medium text-amber-800">หมายเหตุ:</span>
+												<span class="text-amber-700">{investment.notes}</span>
+											</div>
+										</div>
+									{/if}
+								</div>
+
+								<div class="flex flex-wrap gap-2 border-t border-gray-200 pt-4">
+									<button
+										class="flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-blue-600"
+										on:click={() => startEdit(investment)}
+									>
+										<span class="text-lg">✏️</span>
+										แก้ไข
+									</button>
+
+									{#if investment.status === 'active'}
+										<button
+											class="flex items-center gap-2 rounded-md bg-green-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-green-600"
+											on:click={() => updateInvestmentStatus(investment.id, 'completed')}
+										>
+											<span class="text-lg">✅</span>
+											เสร็จสิ้น
+										</button>
+										<button
+											class="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-orange-600"
+											on:click={() => updateInvestmentStatus(investment.id, 'cancelled')}
+										>
+											<span class="text-lg">❌</span>
+											ยกเลิก
+										</button>
+									{:else if investment.status === 'completed' || investment.status === 'cancelled'}
+										<button
+											class="flex items-center gap-2 rounded-md bg-gray-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-gray-600"
+											on:click={() => updateInvestmentStatus(investment.id, 'active')}
+										>
+											<span class="text-lg">🔄</span>
+											เปิดใหม่
+										</button>
+									{/if}
+
+									<button
+										class="flex items-center gap-2 rounded-md bg-red-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-red-600"
+										on:click={() => deleteInvestment(investment.id)}
+									>
+										<span class="text-lg">🗑️</span>
+										ลบ
+									</button>
+								</div>
+							</div>
+						{/each}
+
+						{#if filteredInvestments.length === 0}
+							<div
+								class="flex flex-col items-center justify-center rounded-lg border border-pink-200 bg-white py-16 shadow-lg"
+							>
+								{#if investments.length === 0}
+									<div class="mb-4 text-6xl">💼</div>
+									<h3 class="mb-2 text-2xl font-bold text-gray-800">ยังไม่มีการลงทุน</h3>
+									<p class="mb-6 text-gray-600">เริ่มต้นติดตามการลงทุนของคุณวันนี้</p>
+									<button
+										class="flex items-center gap-2 rounded-md bg-pink-500 px-6 py-3 font-medium text-white transition-colors duration-200 hover:bg-pink-600"
+										on:click={() => {
+											showAddForm = true;
+											resetForm();
+										}}
+									>
+										<span class="text-lg">➕</span>
+										เพิ่มการลงทุนแรก
+									</button>
+								{:else}
+									<div class="mb-4 text-6xl">🔍</div>
+									<h3 class="mb-2 text-2xl font-bold text-gray-800">ไม่พบข้อมูลที่ค้นหา</h3>
+									<p class="mb-6 text-gray-600">ลองเปลี่ยนคำค้นหาหรือสถานะที่กรอง</p>
+									<div class="flex gap-2">
+										<button
+											class="rounded-md bg-gray-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-gray-600"
+											on:click={() => (searchQuery = '')}
+										>
+											ล้างการค้นหา
+										</button>
+										<button
+											class="rounded-md bg-pink-500 px-4 py-2 font-medium text-white transition-colors duration-200 hover:bg-pink-600"
+											on:click={() => {
+												filterStatus = 'all';
+												searchQuery = '';
+											}}
+										>
+											รีเซ็ตตัวกรอง
+										</button>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</section>
+				{/if}
+			</div>
+		</main>
+
+		<!-- Footer -->
+		<footer class="bg-gradient-to-r from-pink-300 to-pink-500 py-8 text-center text-white">
+			<div class="mx-auto max-w-6xl px-4">
+				<h2 class="mb-2 text-lg font-semibold">
+					This Website was made by Chulinxz, feel free to contact me anytime :D
+				</h2>
+				<p class="opacity-90">
+					© Chulinx Folio, All Right Reserved | Implemented by Svelte+Supabase
+				</p>
+			</div>
+		</footer>
+
+		<!-- Transaction History Modal -->
+		{#if showTransactionHistory}
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div
+				class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+				on:click={closeTransactionHistory}
+			>
+				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+				<div
+					class="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+					on:click|stopPropagation={() => {}}
+				>
+					<!-- Modal Header -->
+					<div class="bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white">
+						<div class="flex items-center justify-between">
+							<div>
+								<h2 class="flex items-center gap-2 text-2xl font-bold">
+									<span>📜</span>
+									ประวัติธุรกรรม
+								</h2>
+								<p class="mt-1 text-indigo-100">
+									{#if selectedInvestmentForLogs}
+										การลงทุน #{selectedInvestmentForLogs}
+									{:else}
+										ธุรกรรมทั้งหมด ({transactionLogs.length} รายการ)
+									{/if}
+								</p>
+							</div>
+							<button
+								class="p-2 text-white transition-colors hover:text-indigo-200"
+								on:click={closeTransactionHistory}
+								aria-label="Close transaction history"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M6 18L18 6M6 6l12 12"
+									></path>
+								</svg>
+							</button>
+						</div>
+					</div>
+
+					<!-- Modal Body -->
+					<div class="max-h-[calc(90vh-200px)] overflow-y-auto p-6">
+						{#if transactionLoading}
+							<div class="flex items-center justify-center py-12">
+								<div
+									class="h-12 w-12 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
+								></div>
+							</div>
+						{:else if transactionLogs.length === 0}
+							<div class="py-12 text-center">
+								<div class="mb-4 text-6xl">📭</div>
+								<h3 class="mb-2 text-xl font-bold text-gray-700">ยังไม่มีประวัติธุรกรรม</h3>
+								<p class="text-gray-500">เริ่มสร้างการลงทุนใหม่เพื่อดูประวัติที่นี่</p>
+							</div>
+						{:else}
+							<!-- View Mode Toggle -->
+							<div class="mb-4 flex justify-end">
+								<div class="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+									<button
+										class="rounded-md px-4 py-2 text-sm font-medium transition-colors {transactionViewMode ===
+										'card'
+											? 'bg-indigo-500 text-white'
+											: 'text-gray-600 hover:text-gray-800'}"
+										on:click={() => (transactionViewMode = 'card')}
+									>
+										<span class="mr-1">🃏</span> Card
+									</button>
+									<button
+										class="rounded-md px-4 py-2 text-sm font-medium transition-colors {transactionViewMode ===
+										'table'
+											? 'bg-indigo-500 text-white'
+											: 'text-gray-600 hover:text-gray-800'}"
+										on:click={() => (transactionViewMode = 'table')}
+									>
+										<span class="mr-1">📋</span> Table
+									</button>
+								</div>
+							</div>
+
+							<!-- Card View -->
+							{#if transactionViewMode === 'card'}
+								<div class="space-y-4">
+									{#each transactionLogs as log}
+										{@const typeInfo = formatTransactionType(log.type)}
+										<div
+											class="rounded-xl border border-gray-200 bg-gray-50 p-4 transition-shadow hover:shadow-md"
+										>
+											<div class="flex items-start justify-between gap-4">
+												<!-- Left: Icon & Type -->
+												<div class="flex items-center gap-3">
+													<div
+														class="h-12 w-12 rounded-full {typeInfo.bg} flex items-center justify-center text-2xl"
+													>
+														{typeInfo.icon}
+													</div>
+													<div>
+														<span
+															class="inline-block rounded-full px-3 py-1 text-sm font-medium {typeInfo.bg} {typeInfo.color}"
+														>
+															{typeInfo.label}
+														</span>
+														<p class="mt-1 text-sm text-gray-500">
+															{formatDate(log.transaction_date)}
+														</p>
+													</div>
+												</div>
+
+												<!-- Right: Amount -->
+												<div class="text-right">
+													<p
+														class="text-xl font-bold {log.amount >= 0
+															? 'text-green-600'
+															: 'text-red-600'}"
+													>
+														{log.amount >= 0 ? '+' : ''}{formatCurrency(log.amount)} บาท
+													</p>
+													{#if log.type !== 'initial_investment'}
+														<p class="text-sm text-gray-500">
+															ยอดรวม: {formatCurrency(log.balance_after)} บาท
+														</p>
+													{/if}
+												</div>
+											</div>
+
+											<!-- Details -->
+											<div class="mt-3 border-t border-gray-200 pt-3">
+												<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+													{#if log.investments}
+														<div class="flex items-center gap-1">
+															<span class="text-gray-500">🏷️ การลงทุน:</span>
+															<span class="font-medium">
+																{log.investments.product_type || `#${log.investment_id}`}
+															</span>
+														</div>
+														{#if log.investments.supplier}
+															<div class="flex items-center gap-1">
+																<span class="text-gray-500">🏭 Supplier:</span>
+																<span class="font-medium">{log.investments.supplier}</span>
+															</div>
+														{/if}
+														{#if log.investments.customer}
+															<div class="flex items-center gap-1">
+																<span class="text-gray-500">🛒 Customer:</span>
+																<span class="font-medium">{log.investments.customer}</span>
+															</div>
+														{/if}
+													{/if}
+												</div>
+												{#if log.notes}
+													<p class="mt-2 text-sm text-gray-600">
+														💬 {log.notes}
+													</p>
+												{/if}
+												{#if log.type !== 'initial_investment'}
+													<div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+														<span>ก่อน: {formatCurrency(log.balance_before)} บาท</span>
+														<span>→</span>
+														<span>หลัง: {formatCurrency(log.balance_after)} บาท</span>
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<!-- Table View -->
+								<div class="overflow-x-auto">
+									<table class="w-full min-w-[800px]">
+										<thead class="sticky top-0 bg-gray-100">
+											<tr>
+												<th
+													class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>วันที่</th
+												>
+												<th
+													class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>ประเภท</th
+												>
+												<th
+													class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>การลงทุน</th
+												>
+												<th
+													class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>จำนวนเงิน</th
+												>
+												<th
+													class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>ยอดก่อน</th
+												>
+												<th
+													class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>ยอดหลัง</th
+												>
+												<th
+													class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"
+													>หมายเหตุ</th
+												>
+											</tr>
+										</thead>
+										<tbody class="divide-y divide-gray-200">
+											{#each transactionLogs as log, index}
+												{@const typeInfo = formatTransactionType(log.type)}
+												<tr
+													class="transition-colors hover:bg-gray-50 {index % 2 === 0
+														? 'bg-white'
+														: 'bg-gray-50/50'}"
+												>
+													<!-- วันที่ -->
+													<td class="whitespace-nowrap px-4 py-3">
+														<div class="text-sm text-gray-900">
+															{formatDate(log.transaction_date)}
+														</div>
+													</td>
+
+													<!-- ประเภท -->
+													<td class="whitespace-nowrap px-4 py-3">
+														<span
+															class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium {typeInfo.bg} {typeInfo.color}"
+														>
+															<span>{typeInfo.icon}</span>
+															{typeInfo.label}
+														</span>
+													</td>
+
+													<!-- การลงทุน -->
+													<td class="px-4 py-3">
+														<div class="text-sm font-medium text-gray-900">
+															{log.investments?.product_type || `#${log.investment_id}`}
+														</div>
+														{#if log.investments?.supplier || log.investments?.customer}
+															<div class="text-xs text-gray-500">
+																{#if log.investments?.supplier}
+																	<span>🏭 {log.investments.supplier}</span>
+																{/if}
+																{#if log.investments?.supplier && log.investments?.customer}
+																	<span class="mx-1">•</span>
+																{/if}
+																{#if log.investments?.customer}
+																	<span>🛒 {log.investments.customer}</span>
+																{/if}
+															</div>
+														{/if}
+													</td>
+
+													<!-- จำนวนเงิน -->
+													<td class="whitespace-nowrap px-4 py-3 text-right">
+														<span
+															class="text-sm font-bold {log.amount >= 0
+																? 'text-green-600'
+																: 'text-red-600'}"
+														>
+															{log.amount >= 0 ? '+' : ''}{formatCurrency(log.amount)}
+														</span>
+													</td>
+
+													<!-- ยอดก่อน -->
+													<td class="whitespace-nowrap px-4 py-3 text-right">
+														<span class="text-sm text-gray-600">
+															{log.type === 'initial_investment'
+																? '-'
+																: formatCurrency(log.balance_before)}
+														</span>
+													</td>
+
+													<!-- ยอดหลัง -->
+													<td class="whitespace-nowrap px-4 py-3 text-right">
+														<span class="text-sm text-gray-600">
+															{log.type === 'initial_investment'
+																? '-'
+																: formatCurrency(log.balance_after)}
+														</span>
+													</td>
+
+													<!-- หมายเหตุ -->
+													<td class="px-4 py-3">
+														<div
+															class="max-w-[200px] truncate text-sm text-gray-600"
+															title={log.notes || ''}
+														>
+															{log.notes || '-'}
+														</div>
+													</td>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+							{/if}
+						{/if}
+					</div>
+
+					<!-- Modal Footer -->
+					<div class="border-t border-gray-200 bg-gray-50 px-6 py-4">
+						<div class="flex items-center justify-between">
+							<div class="text-sm text-gray-500">
+								{#if transactionLogs.length > 0}
+									แสดง {transactionLogs.length} รายการ
+								{/if}
+							</div>
+							<button
+								class="rounded-lg bg-gray-500 px-6 py-2 font-medium text-white transition-colors hover:bg-gray-600"
+								on:click={closeTransactionHistory}
+							>
+								ปิด
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
 {/if}
 
 <style>
-  /* Charts Section Styles */
-  .charts-section {
-    margin-bottom: 3rem;
-  }
-  
-  .section-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .chart-card {
-    background: white;
-    border-radius: 1rem;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e5e7eb;
-  }
-  
-  .chart-card.full-width {
-    grid-column: 1 / -1;
-  }
-  
-  .chart-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 1rem;
-  }
-  
-  .chart-content {
-    min-height: 150px;
-  }
-  
-  /* ROI Bar Chart */
-  .roi-bar {
-    margin-bottom: 0.75rem;
-  }
-  
-  .roi-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-  }
-  
-  .roi-rank {
-    font-weight: 600;
-    color: #6b7280;
-    font-size: 0.875rem;
-    min-width: 1.5rem;
-  }
-  
-  .roi-name {
-    flex: 1;
-    font-size: 0.875rem;
-    color: #374151;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  .roi-value {
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-  
-  .roi-value.positive {
-    color: #10b981;
-  }
-  
-  .roi-value.negative {
-    color: #ef4444;
-  }
-  
-  .roi-bar-container {
-    height: 8px;
-    background: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  
-  .roi-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.3s ease;
-  }
-  
-  .roi-bar-fill.positive {
-    background: linear-gradient(90deg, #10b981, #34d399);
-  }
-  
-  .roi-bar-fill.negative {
-    background: linear-gradient(90deg, #ef4444, #f87171);
-  }
-  
-  /* Status Stats */
-  .status-stats {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .status-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  
-  .status-indicator {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-  }
-  
-  .status-indicator.active {
-    background: #10b981;
-  }
-  
-  .status-indicator.completed {
-    background: #3b82f6;
-  }
-  
-  .status-indicator.cancelled {
-    background: #ef4444;
-  }
-  
-  .status-label {
-    flex: 1;
-    font-size: 0.875rem;
-    color: #374151;
-  }
-  
-  .status-count {
-    font-weight: 600;
-    font-size: 1.125rem;
-    color: #1f2937;
-  }
-  
-  /* Monthly Chart */
-  .monthly-chart {
-    display: flex;
-    justify-content: space-around;
-    align-items: flex-end;
-    height: 200px;
-    gap: 1rem;
-  }
-  
-  .monthly-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-  }
-  
-  .monthly-bars {
-    display: flex;
-    gap: 4px;
-    height: 150px;
-    align-items: flex-end;
-  }
-  
-  .bar-container {
-    width: 20px;
-    height: 100%;
-    display: flex;
-    align-items: flex-end;
-  }
-  
-  .bar {
-    width: 100%;
-    border-radius: 4px 4px 0 0;
-    transition: height 0.3s ease;
-    min-height: 4px;
-  }
-  
-  .bar.invested {
-    background: linear-gradient(180deg, #ec4899, #f472b6);
-  }
-  
-  .bar.received {
-    background: linear-gradient(180deg, #10b981, #34d399);
-  }
-  
-  .monthly-label {
-    font-size: 0.75rem;
-    color: #6b7280;
-    margin-top: 0.5rem;
-    text-align: center;
-  }
-  
-  .monthly-count {
-    font-size: 0.625rem;
-    color: #9ca3af;
-  }
-  
-  .chart-legend {
-    display: flex;
-    justify-content: center;
-    gap: 1.5rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e5e7eb;
-  }
-  
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    color: #6b7280;
-  }
-  
-  .legend-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-  }
-  
-  .legend-color.invested {
-    background: linear-gradient(180deg, #ec4899, #f472b6);
-  }
-  
-  .legend-color.received {
-    background: linear-gradient(180deg, #10b981, #34d399);
-  }
-  
-  /* Product Table */
-  .product-table {
-    width: 100%;
-  }
-  
-  .table-header {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1fr;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: #f3f4f6;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-  }
-  
-  .table-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1fr;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 0.875rem;
-    align-items: center;
-  }
-  
-  .table-row:hover {
-    background: #f9fafb;
-  }
-  
-  .product-name {
-    font-weight: 500;
-    color: #1f2937;
-  }
-  
-  .no-data {
-    text-align: center;
-    color: #9ca3af;
-    padding: 2rem;
-    font-size: 0.875rem;
-  }
-  
-  /* Debug Info - hide in production */
-  .debug-info {
-    display: none; /* Change to 'block' to show debug info */
-  }
+	/* Charts Section Styles */
+	.charts-section {
+		margin-bottom: 3rem;
+	}
+
+	.section-title {
+		font-size: 1.5rem;
+		font-weight: 600;
+		color: #1f2937;
+		margin-bottom: 1.5rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.charts-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+		gap: 1.5rem;
+	}
+
+	.chart-card {
+		background: white;
+		border-radius: 1rem;
+		padding: 1.5rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		border: 1px solid #e5e7eb;
+	}
+
+	.chart-card.full-width {
+		grid-column: 1 / -1;
+	}
+
+	.chart-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #374151;
+		margin-bottom: 1rem;
+	}
+
+	.chart-content {
+		min-height: 150px;
+	}
+
+	/* ROI Bar Chart */
+	.roi-bar {
+		margin-bottom: 0.75rem;
+	}
+
+	.roi-info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.25rem;
+	}
+
+	.roi-rank {
+		font-weight: 600;
+		color: #6b7280;
+		font-size: 0.875rem;
+		min-width: 1.5rem;
+	}
+
+	.roi-name {
+		flex: 1;
+		font-size: 0.875rem;
+		color: #374151;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.roi-value {
+		font-weight: 600;
+		font-size: 0.875rem;
+	}
+
+	.roi-value.positive {
+		color: #10b981;
+	}
+
+	.roi-value.negative {
+		color: #ef4444;
+	}
+
+	.roi-bar-container {
+		height: 8px;
+		background: #e5e7eb;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.roi-bar-fill {
+		height: 100%;
+		border-radius: 4px;
+		transition: width 0.3s ease;
+	}
+
+	.roi-bar-fill.positive {
+		background: linear-gradient(90deg, #10b981, #34d399);
+	}
+
+	.roi-bar-fill.negative {
+		background: linear-gradient(90deg, #ef4444, #f87171);
+	}
+
+	/* Status Stats */
+	.status-stats {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.status-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.status-indicator {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+	}
+
+	.status-indicator.active {
+		background: #10b981;
+	}
+
+	.status-indicator.completed {
+		background: #3b82f6;
+	}
+
+	.status-indicator.cancelled {
+		background: #ef4444;
+	}
+
+	.status-label {
+		flex: 1;
+		font-size: 0.875rem;
+		color: #374151;
+	}
+
+	.status-count {
+		font-weight: 600;
+		font-size: 1.125rem;
+		color: #1f2937;
+	}
+
+	/* Monthly Chart */
+	.monthly-chart {
+		display: flex;
+		justify-content: space-around;
+		align-items: flex-end;
+		height: 200px;
+		gap: 1rem;
+	}
+
+	.monthly-item {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		flex: 1;
+	}
+
+	.monthly-bars {
+		display: flex;
+		gap: 4px;
+		height: 150px;
+		align-items: flex-end;
+	}
+
+	.bar-container {
+		width: 20px;
+		height: 100%;
+		display: flex;
+		align-items: flex-end;
+	}
+
+	.bar {
+		width: 100%;
+		border-radius: 4px 4px 0 0;
+		transition: height 0.3s ease;
+		min-height: 4px;
+	}
+
+	.bar.invested {
+		background: linear-gradient(180deg, #ec4899, #f472b6);
+	}
+
+	.bar.received {
+		background: linear-gradient(180deg, #10b981, #34d399);
+	}
+
+	.monthly-label {
+		font-size: 0.75rem;
+		color: #6b7280;
+		margin-top: 0.5rem;
+		text-align: center;
+	}
+
+	.monthly-count {
+		font-size: 0.625rem;
+		color: #9ca3af;
+	}
+
+	.chart-legend {
+		display: flex;
+		justify-content: center;
+		gap: 1.5rem;
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid #e5e7eb;
+	}
+
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		color: #6b7280;
+	}
+
+	.legend-color {
+		width: 12px;
+		height: 12px;
+		border-radius: 2px;
+	}
+
+	.legend-color.invested {
+		background: linear-gradient(180deg, #ec4899, #f472b6);
+	}
+
+	.legend-color.received {
+		background: linear-gradient(180deg, #10b981, #34d399);
+	}
+
+	/* Product Table */
+	.product-table {
+		width: 100%;
+	}
+
+	.table-header {
+		display: grid;
+		grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1fr;
+		gap: 0.5rem;
+		padding: 0.75rem;
+		background: #f3f4f6;
+		border-radius: 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+	}
+
+	.table-row {
+		display: grid;
+		grid-template-columns: 2fr 1fr 1.5fr 1.5fr 1fr;
+		gap: 0.5rem;
+		padding: 0.75rem;
+		border-bottom: 1px solid #e5e7eb;
+		font-size: 0.875rem;
+		align-items: center;
+	}
+
+	.table-row:hover {
+		background: #f9fafb;
+	}
+
+	.product-name {
+		font-weight: 500;
+		color: #1f2937;
+	}
+
+	.no-data {
+		text-align: center;
+		color: #9ca3af;
+		padding: 2rem;
+		font-size: 0.875rem;
+	}
+
+	/* Debug Info - hide in production */
+	.debug-info {
+		display: none; /* Change to 'block' to show debug info */
+	}
 </style>
