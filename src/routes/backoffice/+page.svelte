@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { supabase } from '$lib/supabase';
-	import { fade, slide } from 'svelte/transition';
+	import { fade, slide, scale } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 
 	// Types
@@ -52,6 +52,21 @@
 	let searchTerm = $state('');
 	let openDropdownId = $state<string | null>(null);
 	let selectedItems = $state<Set<string>>(new Set());
+
+	// Confirmation Modal State
+	let showConfirmModal = $state(false);
+	let confirmConfig = $state({
+		title: '',
+		message: '',
+		confirmText: 'Confirm',
+		cancelText: 'Cancel',
+		type: 'info', // info | warning | danger
+		onConfirm: async () => {}
+	});
+
+	function closeConfirmModal() {
+		showConfirmModal = false;
+	}
 
 	// Modal State
 	let showModal = $state(false);
@@ -109,7 +124,7 @@
 		}
 	}
 
-	async function updateOrderStatus(logId: string, newStatus: string) {
+	async function processUpdateOrderStatus(logId: string, newStatus: string) {
 		const { error } = await supabase
 			.from('preorder_logs')
 			.update({ status: newStatus })
@@ -119,7 +134,49 @@
 			alert('Error updating status: ' + error.message);
 		} else {
 			const index = preorderLogs.findIndex((l) => l.id === logId);
-			if (index !== -1) preorderLogs[index].status = newStatus;
+			if (index !== -1) {
+				const oldStatus = preorderLogs[index].status;
+				preorderLogs[index].status = newStatus;
+
+				// Notify if changed to complete and was not already complete
+				if (newStatus === 'complete' && oldStatus !== 'complete' && oldStatus !== 'completed') {
+					console.log(`[Individual Notify] Triggering notification for item ${logId}`);
+					const item = preorderLogs[index];
+					try {
+						const backendUrl = import.meta.env.VITE_BACKEND_URL;
+						fetch(`${backendUrl}/api/notify-arrived`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								userLineId: item.user_line_id,
+								items: [item]
+							})
+						});
+					} catch (e) {
+						console.error('Failed to notify user for single item:', e);
+					}
+				}
+			}
+		}
+		showConfirmModal = false; // Close modal on success
+	}
+
+	async function updateOrderStatus(logId: string, newStatus: string) {
+		// ถ้าจะเปลี่ยนเป็น complete (Product arrived) ให้ Confirm ก่อน
+		if (newStatus === 'complete') {
+			confirmConfig = {
+				title: 'Confirm Product Arrival',
+				message:
+					'Are you sure you want to mark this item as ARRIVED? This will send a notification to the customer immediately.',
+				confirmText: 'Yes, Notify Customer',
+				cancelText: 'Cancel',
+				type: 'info',
+				onConfirm: async () => await processUpdateOrderStatus(logId, newStatus)
+			};
+			showConfirmModal = true;
+		} else {
+			// สถานะอื่นอัพเดตเลย
+			await processUpdateOrderStatus(logId, newStatus);
 		}
 	}
 
@@ -166,56 +223,72 @@
 
 	async function handleBulkArrived() {
 		if (selectedItems.size === 0) return;
-		if (
-			!confirm(
-				`Are you sure you want to mark ${selectedItems.size} items as ARRIVED and notify customers?`
-			)
-		)
-			return;
 
-		loading = true;
-		const selectedArray = Array.from(selectedItems);
+		// Filter out items that are already complete to avoid double notification
+		const itemsToUpdate = Array.from(selectedItems).filter((id) => {
+			const item = preorderLogs.find((l) => l.id === id);
+			return item && item.status !== 'complete' && item.status !== 'completed';
+		});
 
-		// 1. Update status to 'complete' in Supabase
-		const { error } = await supabase
-			.from('preorder_logs')
-			.update({ status: 'complete' })
-			.in('id', selectedArray);
-
-		if (error) {
-			alert('Error updating items: ' + error.message);
-		} else {
-			// 2. Identify unique users to notify
-			const usersToNotify = new Map<string, PreorderLog[]>();
-			preorderLogs.forEach((log) => {
-				if (selectedItems.has(log.id)) {
-					const userItems = usersToNotify.get(log.user_line_id) || [];
-					userItems.push(log);
-					usersToNotify.set(log.user_line_id, userItems);
-				}
-			});
-
-			// 3. Send notifications via BOT API
-			for (const [userId, items] of usersToNotify.entries()) {
-				try {
-					await fetch('http://localhost:3000/api/notify-arrived', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ userLineId: userId, items })
-					});
-				} catch (e) {
-					console.error('Failed to notify user:', userId, e);
-				}
-			}
-
-			// 4. Update local state
-			preorderLogs = preorderLogs.map((log) =>
-				selectedItems.has(log.id) ? { ...log, status: 'complete' } : log
-			);
+		if (itemsToUpdate.length === 0) {
+			alert('Selected items are already marked as arrived.');
 			selectedItems = new Set();
-			alert('Successfully updated and notified customers! 🎉');
+			return;
 		}
-		loading = false;
+
+		confirmConfig = {
+			title: 'Bulk Product Arrival',
+			message: `Are you sure you want to mark ${itemsToUpdate.length} NEW items as ARRIVED? This will send notifications to customers immediately.`,
+			confirmText: 'Yes, Notify All',
+			cancelText: 'Cancel',
+			type: 'info',
+			onConfirm: async () => {
+				loading = true;
+
+				// 1. Update status to 'complete' in Supabase
+				const { error } = await supabase
+					.from('preorder_logs')
+					.update({ status: 'complete' })
+					.in('id', itemsToUpdate);
+
+				if (error) {
+					alert('Error updating items: ' + error.message);
+				} else {
+					// 2. Identify unique users to notify
+					const usersToNotify = new Map<string, PreorderLog[]>();
+					preorderLogs.forEach((log) => {
+						if (itemsToUpdate.includes(log.id)) {
+							const userItems = usersToNotify.get(log.user_line_id) || [];
+							userItems.push(log);
+							usersToNotify.set(log.user_line_id, userItems);
+						}
+					});
+
+					// 3. Send notifications via BOT API
+					for (const [userId, items] of usersToNotify.entries()) {
+						try {
+							const backendUrl = import.meta.env.VITE_BACKEND_URL;
+							await fetch(`${backendUrl}/api/notify-arrived`, {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ userLineId: userId, items })
+							});
+						} catch (e) {
+							console.error('Failed to notify user:', userId, e);
+						}
+					}
+
+					// 4. Update local state
+					preorderLogs = preorderLogs.map((log) =>
+						selectedItems.has(log.id) ? { ...log, status: 'complete' } : log
+					);
+					selectedItems = new Set();
+				}
+				loading = false;
+				showConfirmModal = false; // Close modal logic
+			}
+		};
+		showConfirmModal = true;
 	}
 
 	async function deleteProduct(id: string) {
@@ -1195,6 +1268,60 @@
 			>
 				Cancel
 			</button>
+		</div>
+	</div>
+{/if}
+
+<!-- Confirmation Modal -->
+{#if showConfirmModal}
+	<div
+		class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div
+			class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+			transition:fade
+		></div>
+		<div
+			class="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+			transition:scale={{ start: 0.95 }}
+		>
+			<div class="p-6 text-center">
+				<div
+					class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50"
+				>
+					<svg
+						class="h-8 w-8 text-indigo-600"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+						/>
+					</svg>
+				</div>
+				<h3 class="mb-2 text-lg font-bold text-slate-900">{confirmConfig.title}</h3>
+				<p class="mb-6 text-sm text-slate-500">{confirmConfig.message}</p>
+				<div class="grid grid-cols-2 gap-3">
+					<button
+						onclick={() => (showConfirmModal = false)}
+						class="rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+					>
+						{confirmConfig.cancelText}
+					</button>
+					<button
+						onclick={confirmConfig.onConfirm}
+						class="rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-transform hover:bg-indigo-700 active:scale-95"
+					>
+						{confirmConfig.confirmText}
+					</button>
+				</div>
+			</div>
 		</div>
 	</div>
 {/if}
