@@ -535,12 +535,12 @@
 				<div class="hidden space-y-4 md:block">
 					{#each groupedOrders as order (order.order_group_id)}
 						<div
-							class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
+							class="rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
 							transition:fade
 						>
 							<!-- Order Header -->
 							<div
-								class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4"
+								class="flex items-center justify-between overflow-hidden rounded-t-2xl border-b border-slate-100 bg-slate-50/50 px-6 py-4"
 							>
 								<div class="flex items-center gap-4">
 									<div>
@@ -558,92 +558,95 @@
 									</div>
 								</div>
 
-								<div class="flex items-center gap-4">
-									<!-- Summary -->
-									<div class="text-right">
-										<p class="text-xs text-slate-400">{order.total_items} ชิ้น</p>
-										<p class="text-lg font-bold text-indigo-600">
-											฿{order.total_price.toLocaleString()}
-										</p>
-									</div>
-
-									<!-- Status Dropdown -->
-									<div class="relative">
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												toggleDropdown(order.order_group_id);
-											}}
-											class="inline-flex w-32 items-center justify-between rounded-full px-4 py-1.5 text-xs font-bold shadow-sm ring-1 ring-inset transition-all
-											{order.status === 'complete' || order.status === 'completed'
-												? 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100'
-												: order.status === 'fail' || order.status === 'cancelled'
-													? 'bg-rose-50 text-rose-700 ring-rose-200 hover:bg-rose-100'
-													: 'bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100'}"
-										>
-											<span class="capitalize">{order.status}</span>
-											<svg
-												class="h-4 w-4 opacity-50"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M19 9l-7 7-7-7"
-												/>
-											</svg>
-										</button>
-
-										{#if openDropdownId === order.order_group_id}
-											<div
-												transition:fade={{ duration: 100 }}
-												class="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200 focus:outline-none"
-											>
-												<div class="space-y-1">
-													<button
-														onclick={() => updateGroupStatus(order.order_group_id, 'pending')}
-														class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
-													>
-														<div class="h-2 w-2 rounded-full bg-amber-400"></div>
-														Pending
-													</button>
-													<button
-														onclick={() => updateGroupStatus(order.order_group_id, 'complete')}
-														class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-													>
-														<div class="h-2 w-2 rounded-full bg-emerald-400"></div>
-														Complete
-													</button>
-													<button
-														onclick={() => updateGroupStatus(order.order_group_id, 'fail')}
-														class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
-													>
-														<div class="h-2 w-2 rounded-full bg-rose-400"></div>
-														Fail
-													</button>
-												</div>
-											</div>
-										{/if}
-									</div>
+								<!-- Summary -->
+								<div class="text-right">
+									<p class="text-xs text-slate-400">{order.total_items} ชิ้น</p>
+									<p class="text-lg font-bold text-indigo-600">
+										฿{order.total_price.toLocaleString()}
+									</p>
 								</div>
 							</div>
 
 							<!-- Order Items -->
 							<div class="divide-y divide-slate-100">
 								{#each order.items as item}
-									<div class="flex items-center justify-between px-6 py-3">
-										<div>
-											<span class="font-medium text-indigo-600">{item.product_code}</span>
-											<span class="ml-2 text-slate-700">{item.product_name}</span>
+									<div
+										class="relative flex items-center justify-between px-6 py-3 transition-colors hover:bg-slate-50/30 {openDropdownId ===
+										item.id.toString()
+											? 'z-20'
+											: 'z-auto'}"
+									>
+										<div class="flex-1">
+											<span class="font-bold text-indigo-600">{item.product_code}</span>
+											<span class="ml-2 font-medium text-slate-700">{item.product_name}</span>
 										</div>
-										<div class="flex items-center gap-6">
-											<span class="text-sm text-slate-500">x{item.quantity}</span>
-											<span class="font-medium text-slate-900"
+										<div class="flex items-center gap-4">
+											<span class="text-sm font-medium text-slate-400">x{item.quantity}</span>
+											<span class="w-16 text-right font-bold text-slate-700"
 												>฿{item.total_price.toLocaleString()}</span
 											>
+
+											<!-- Individual Status Dropdown -->
+											<div class="relative">
+												<button
+													onclick={(e) => {
+														e.stopPropagation();
+														toggleDropdown(item.id.toString());
+													}}
+													class="inline-flex w-24 items-center justify-between rounded-lg px-2 py-1 text-[10px] font-bold shadow-sm ring-1 ring-inset transition-all
+													{item.status === 'complete' || item.status === 'completed'
+														? 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100'
+														: item.status === 'fail' || item.status === 'cancelled'
+															? 'bg-rose-50 text-rose-700 ring-rose-200 hover:bg-rose-100'
+															: 'bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100'}"
+												>
+													<span class="capitalize">{item.status}</span>
+													<svg
+														class="h-3 w-3 opacity-50"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M19 9l-7 7-7-7"
+														/>
+													</svg>
+												</button>
+
+												{#if openDropdownId === item.id.toString()}
+													<div
+														transition:fade={{ duration: 100 }}
+														class="absolute right-0 z-50 mt-1 w-32 origin-top-right rounded-xl bg-white p-1 shadow-lg ring-1 ring-slate-200 focus:outline-none"
+													>
+														<div class="space-y-0.5">
+															<button
+																onclick={() => updateOrderStatus(item.id, 'pending')}
+																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+															>
+																<div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
+																Pending
+															</button>
+															<button
+																onclick={() => updateOrderStatus(item.id, 'complete')}
+																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+															>
+																<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
+																Complete
+															</button>
+															<button
+																onclick={() => updateOrderStatus(item.id, 'fail')}
+																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+															>
+																<div class="h-1.5 w-1.5 rounded-full bg-rose-400"></div>
+																Fail
+															</button>
+														</div>
+													</div>
+												{/if}
+											</div>
 										</div>
 									</div>
 								{/each}
@@ -655,9 +658,9 @@
 				<!-- Mobile View (Card List) -->
 				<div class="space-y-3 md:hidden">
 					{#each groupedOrders as order (order.order_group_id)}
-						<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+						<div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
 							<!-- Order Header -->
-							<div class="border-b border-slate-100 p-4">
+							<div class="overflow-hidden rounded-t-2xl border-b border-slate-100 p-4">
 								<div class="mb-3 flex items-start justify-between">
 									<div>
 										<p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -672,83 +675,94 @@
 										<h4 class="font-bold text-slate-900">{order.user_display_name || 'Unknown'}</h4>
 										<p class="font-mono text-[10px] text-slate-400">{order.user_line_id}</p>
 									</div>
-
-									<div class="relative text-right">
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												toggleDropdown(order.order_group_id);
-											}}
-											class="inline-flex w-28 items-center justify-between rounded-full px-3 py-1 text-[10px] font-bold shadow-sm ring-1 ring-inset transition-all
-											{order.status === 'complete' || order.status === 'completed'
-												? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-												: order.status === 'fail' || order.status === 'cancelled'
-													? 'bg-rose-50 text-rose-700 ring-rose-200'
-													: 'bg-amber-50 text-amber-700 ring-amber-200'}"
-										>
-											<span class="capitalize">{order.status}</span>
-											<svg
-												class="h-3 w-3 opacity-50"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M19 9l-7 7-7-7"
-												/>
-											</svg>
-										</button>
-
-										{#if openDropdownId === order.order_group_id}
-											<div
-												transition:fade={{ duration: 100 }}
-												class="absolute right-0 z-50 mt-1 w-32 origin-top-right rounded-xl bg-white p-1 shadow-xl ring-1 ring-slate-200"
-											>
-												<div class="space-y-0.5">
-													<button
-														onclick={() => updateGroupStatus(order.order_group_id, 'pending')}
-														class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-amber-700 hover:bg-amber-50"
-													>
-														<div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
-														Pending
-													</button>
-													<button
-														onclick={() => updateGroupStatus(order.order_group_id, 'complete')}
-														class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-emerald-700 hover:bg-emerald-50"
-													>
-														<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
-														Complete
-													</button>
-													<button
-														onclick={() => updateGroupStatus(order.order_group_id, 'fail')}
-														class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-rose-700 hover:bg-rose-50"
-													>
-														<div class="h-1.5 w-1.5 rounded-full bg-rose-400"></div>
-														Fail
-													</button>
-												</div>
-											</div>
-										{/if}
-									</div>
 								</div>
 							</div>
 
 							<!-- Order Items -->
 							<div class="divide-y divide-slate-100 bg-slate-50/50">
 								{#each order.items as item}
-									<div class="flex items-center justify-between px-4 py-2.5">
-										<div class="min-w-0 flex-1">
-											<p class="text-[10px] font-bold text-indigo-600">{item.product_code}</p>
-											<p class="truncate text-xs font-medium text-slate-700">{item.product_name}</p>
+									<div
+										class="relative px-4 py-3 {openDropdownId === item.id.toString()
+											? 'z-20'
+											: 'z-auto'}"
+									>
+										<div class="mb-2 flex items-start justify-between">
+											<div class="min-w-0 flex-1">
+												<p class="text-[10px] font-bold text-indigo-600">{item.product_code}</p>
+												<p class="truncate text-xs font-medium text-slate-700">
+													{item.product_name}
+												</p>
+											</div>
+											<div class="ml-3 flex-shrink-0 text-right">
+												<p class="text-[10px] text-slate-400">x{item.quantity}</p>
+												<p class="text-sm font-bold text-slate-900">
+													฿{item.total_price.toLocaleString()}
+												</p>
+											</div>
 										</div>
-										<div class="ml-3 flex-shrink-0 text-right">
-											<p class="text-[10px] text-slate-400">x{item.quantity}</p>
-											<p class="text-sm font-bold text-slate-900">
-												฿{item.total_price.toLocaleString()}
-											</p>
+
+										<!-- Mobile Individual Status -->
+										<div class="flex justify-end">
+											<div class="relative">
+												<button
+													onclick={(e) => {
+														e.stopPropagation();
+														toggleDropdown(item.id.toString());
+													}}
+													class="inline-flex w-24 items-center justify-between rounded-lg px-2 py-1 text-[10px] font-bold shadow-sm ring-1 ring-inset transition-all
+													{item.status === 'complete' || item.status === 'completed'
+														? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+														: item.status === 'fail' || item.status === 'cancelled'
+															? 'bg-rose-50 text-rose-700 ring-rose-200'
+															: 'bg-amber-50 text-amber-700 ring-amber-200'}"
+												>
+													<span class="capitalize">{item.status}</span>
+													<svg
+														class="h-3 w-3 opacity-50"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M19 9l-7 7-7-7"
+														/>
+													</svg>
+												</button>
+
+												{#if openDropdownId === item.id.toString()}
+													<div
+														transition:fade={{ duration: 100 }}
+														class="absolute right-0 z-50 mt-1 w-32 origin-top-right rounded-xl bg-white p-1 shadow-lg ring-1 ring-slate-200"
+													>
+														<div class="space-y-0.5">
+															<button
+																onclick={() => updateOrderStatus(item.id, 'pending')}
+																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-amber-700 hover:bg-amber-50"
+															>
+																<div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
+																Pending
+															</button>
+															<button
+																onclick={() => updateOrderStatus(item.id, 'complete')}
+																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-emerald-700 hover:bg-emerald-50"
+															>
+																<div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
+																Complete
+															</button>
+															<button
+																onclick={() => updateOrderStatus(item.id, 'fail')}
+																class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-rose-700 hover:bg-rose-50"
+															>
+																<div class="h-1.5 w-1.5 rounded-full bg-rose-400"></div>
+																Fail
+															</button>
+														</div>
+													</div>
+												{/if}
+											</div>
 										</div>
 									</div>
 								{/each}
@@ -756,7 +770,7 @@
 
 							<!-- Order Total -->
 							<div
-								class="flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3"
+								class="flex items-center justify-between overflow-hidden rounded-b-2xl bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3"
 							>
 								<span class="text-sm font-medium text-slate-600">รวม {order.total_items} ชิ้น</span>
 								<span class="text-lg font-bold text-indigo-600"
