@@ -516,7 +516,7 @@
 
 			<div class="flex rounded-lg bg-slate-100 p-1">
 				<button
-					class="w-24 rounded-md py-1.5 text-[11px] font-medium transition-all sm:w-32 sm:text-sm {activeTab ===
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-24 sm:text-sm {activeTab ===
 					'products'
 						? 'bg-white text-indigo-600 shadow-sm'
 						: 'text-slate-500 hover:text-slate-700'}"
@@ -525,13 +525,25 @@
 					Products
 				</button>
 				<button
-					class="w-24 rounded-md py-1.5 text-[11px] font-medium transition-all sm:w-32 sm:text-sm {activeTab ===
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-24 sm:text-sm text-slate-500 hover:text-slate-700"
+					onclick={() => goto('/backoffice/sets')}
+				>
+					Sets
+				</button>
+				<button
+					class="w-20 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-28 sm:text-sm {activeTab ===
 					'preorders'
 						? 'bg-white text-indigo-600 shadow-sm'
 						: 'text-slate-500 hover:text-slate-700'}"
 					onclick={() => (activeTab = 'preorders')}
 				>
 					Pre-orders
+				</button>
+				<button
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-24 sm:text-sm text-slate-500 hover:text-slate-700"
+					onclick={() => goto('/backoffice/settings')}
+				>
+					Settings
 				</button>
 			</div>
 
