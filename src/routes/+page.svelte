@@ -607,85 +607,129 @@
 	}
 
 	// ข้อมูลสำหรับกราฟ
+	// ข้อมูลสำหรับกราฟ
 	$: chartData = {
-		monthly: getMonthlyData(),
-		roiComparison: getROIComparisonData(),
-		statusDistribution: getStatusDistributionData(),
-		productTypeData: getProductTypeData()
+		monthly: getMonthlyData(investments, allTransactionLogs, summaryType),
+		roiComparison: getROIComparisonData(investments),
+		statusDistribution: getStatusDistributionData(investments),
+		productTypeData: getProductTypeData(investments, allTransactionLogs, summaryType)
 	};
 
-	function getMonthlyData() {
-		console.log('Getting monthly data from investments:', investments); // Debug log
+	function getMonthlyData(invs: any[], logs: any[], type: string) {
 		const monthlyStats: Record<string, { invested: number; received: number; count: number }> = {};
-		investments.forEach((inv) => {
-			const month = inv.start_date.substring(0, 7); // YYYY-MM
-			if (!monthlyStats[month]) {
-				monthlyStats[month] = { invested: 0, received: 0, count: 0 };
-			}
-			monthlyStats[month].invested += parseFloat(inv.amount);
-			monthlyStats[month].received += parseFloat(inv.current_received || 0);
-			monthlyStats[month].count += 1;
-		});
-		const result = Object.entries(monthlyStats).sort().slice(-6); // 6 เดือนล่าสุด
-		console.log('Monthly data result:', result); // Debug log
-		return result;
+		
+		if (type === 'investments') {
+			(invs || []).forEach((inv) => {
+				if (!inv || !inv.start_date) return;
+				const dateStr = String(inv.start_date);
+				const month = dateStr.includes('-') ? dateStr.substring(0, 7) : dateStr.substring(0, 7); // Assuming YYYY-MM-DD
+				if (!monthlyStats[month]) {
+					monthlyStats[month] = { invested: 0, received: 0, count: 0 };
+				}
+				monthlyStats[month].invested += parseFloat(inv.amount || 0) || 0;
+				monthlyStats[month].received += parseFloat(inv.current_received || 0) || 0;
+				monthlyStats[month].count += 1;
+			});
+		} else {
+			// Cash Flow Mode
+			(logs || []).forEach((log) => {
+				if (!log || !log.transaction_date) return;
+				const dateStr = String(log.transaction_date);
+				const month = dateStr.substring(0, 7);
+				if (!monthlyStats[month]) {
+					monthlyStats[month] = { invested: 0, received: 0, count: 0 };
+				}
+				
+				const amount = parseFloat(log.amount || 0) || 0;
+				if (log.type === 'initial_investment') {
+					monthlyStats[month].invested += Math.abs(amount);
+				} else if (log.type === 'deposit') {
+					monthlyStats[month].received += amount;
+				} else if (log.type === 'withdrawal') {
+					monthlyStats[month].received -= amount;
+				}
+				monthlyStats[month].count += 1;
+			});
+		}
+
+		return Object.entries(monthlyStats).sort((a, b) => a[0].localeCompare(b[0])).slice(-6); // 6 เดือนล่าสุด
 	}
 
-	function getROIComparisonData() {
-		const result = investments
-			.filter((inv) => inv.current_received > 0)
-			.map((inv) => ({
-				id: inv.id,
-				name: inv.product_type || `การลงทุน #${inv.id}`,
-				roi:
-					((parseFloat(inv.current_received) - parseFloat(inv.amount)) / parseFloat(inv.amount)) *
-					100,
-				amount: parseFloat(inv.amount)
-			}))
+	function getROIComparisonData(invs: any[]) {
+		return (invs || [])
+			.filter((inv) => inv && (parseFloat(inv.current_received || 0) > 0 || parseFloat(inv.amount || 0) > 0))
+			.map((inv) => {
+				const invested = parseFloat(inv.amount || 0) || 0;
+				const received = parseFloat(inv.current_received || 0) || 0;
+				return {
+					id: inv.id,
+					name: inv.product_type || `การลงทุน #${inv.id}`,
+					roi: invested > 0 ? ((received - invested) / invested) * 100 : 0,
+					amount: invested
+				};
+			})
 			.sort((a, b) => b.roi - a.roi)
 			.slice(0, 5); // Top 5
-		console.log('ROI comparison data:', result); // Debug log
-		return result;
 	}
 
-	function getStatusDistributionData() {
+	function getStatusDistributionData(invs: any[]) {
 		const statusCount: Record<string, number> = { active: 0, completed: 0, cancelled: 0 };
-		investments.forEach((inv) => {
-			if (statusCount[inv.status] !== undefined) {
-				statusCount[inv.status] = (statusCount[inv.status] || 0) + 1;
+		(invs || []).forEach((inv) => {
+			if (!inv || !inv.status) return;
+			const status = String(inv.status).toLowerCase();
+			if (statusCount[status] !== undefined) {
+				statusCount[status] = (statusCount[status] || 0) + 1;
 			}
 		});
-		console.log('Status distribution:', statusCount); // Debug log
 		return statusCount;
 	}
 
-	function getProductTypeData() {
-		const typeStats: Record<string, { count: number; totalAmount: number; totalReceived: number }> =
-			{};
-		investments.forEach((inv) => {
-			const type = inv.product_type || 'อื่นๆ';
-			if (!typeStats[type]) {
-				typeStats[type] = { count: 0, totalAmount: 0, totalReceived: 0 };
-			}
-			typeStats[type].count += 1;
-			typeStats[type].totalAmount += parseFloat(inv.amount);
-			typeStats[type].totalReceived += parseFloat(inv.current_received || 0);
-		});
-		const result = Object.entries(typeStats)
-			.map(([type, data]) => ({
-				type,
+	function getProductTypeData(invs: any[], logs: any[], type: string) {
+		const typeStats: Record<string, { count: number; totalAmount: number; totalReceived: number }> = {};
+		
+		if (type === 'investments') {
+			(invs || []).forEach((inv) => {
+				const productType = inv.product_type || 'อื่นๆ';
+				if (!typeStats[productType]) {
+					typeStats[productType] = { count: 0, totalAmount: 0, totalReceived: 0 };
+				}
+				typeStats[productType].count += 1;
+				typeStats[productType].totalAmount += parseFloat(inv.amount || 0);
+				typeStats[productType].totalReceived += parseFloat(inv.current_received || 0);
+			});
+		} else {
+			// Cash Flow Mode
+			(logs || []).forEach((log) => {
+				const productType = log.investments?.product_type || 'อื่นๆ';
+				if (!typeStats[productType]) {
+					typeStats[productType] = { count: 0, totalAmount: 0, totalReceived: 0 };
+				}
+				
+				const amount = parseFloat(log.amount || 0);
+				if (log.type === 'initial_investment') {
+					typeStats[productType].totalAmount += Math.abs(amount);
+				} else if (log.type === 'deposit') {
+					typeStats[productType].totalReceived += amount;
+				} else if (log.type === 'withdrawal') {
+					typeStats[productType].totalReceived -= amount;
+				}
+				typeStats[productType].count += 1;
+			});
+		}
+
+		return Object.entries(typeStats)
+			.map(([productType, data]) => ({
+				type: productType,
 				count: data.count,
 				amount: data.totalAmount,
 				received: data.totalReceived,
-				roi:
-					data.totalAmount > 0
-						? ((data.totalReceived - data.totalAmount) / data.totalAmount) * 100
-						: 0
+				roi: data.totalAmount > 0
+					? ((data.totalReceived - data.totalAmount) / data.totalAmount) * 100
+					: 0
 			}))
 			.sort((a, b) => b.amount - a.amount);
-		console.log('Product type data:', result); // Debug log
-		return result;
 	}
+
 
 	// Transaction History Functions
 	async function loadTransactionLogs(investmentId: number | null = null) {
