@@ -13,6 +13,7 @@
 	let loading = true;
 	let error: string | null = null;
 	let showAddForm = false;
+	let showTypeSelector = false; // NEW: Popup for selecting investment type
 	let editingInvestment: any = null;
 	let showEditModal = false;
 	let editModalInvestment: any = null;
@@ -47,13 +48,8 @@
 		start_date: new Date().toISOString().split('T')[0],
 		end_date: '',
 		expected_return: '',
-		current_received: '',
-		status: 'active',
 		notes: '',
-		product_type: '',
-		supplier: '',
-		customer: '',
-		profit_margin: ''
+		product_type: ''
 	};
 
 	onMount(async () => {
@@ -143,13 +139,10 @@
 				start_date: formData.start_date,
 				end_date: formData.end_date || null,
 				expected_return: formData.expected_return ? parseFloat(formData.expected_return) : null,
-				current_received: formData.current_received ? parseFloat(formData.current_received) : 0,
-				status: formData.status,
+				current_received: 0,
+				status: 'active',
 				notes: formData.notes,
-				product_type: formData.product_type,
-				supplier: formData.supplier,
-				customer: formData.customer,
-				profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null
+				product_type: formData.product_type
 			};
 
 			const result = await investmentService.addInvestment(newInvestment);
@@ -187,13 +180,8 @@
 				start_date: formData.start_date,
 				end_date: formData.end_date || null,
 				expected_return: formData.expected_return ? parseFloat(formData.expected_return) : null,
-				current_received: formData.current_received ? parseFloat(formData.current_received) : 0,
-				status: formData.status,
 				notes: formData.notes,
-				product_type: formData.product_type,
-				supplier: formData.supplier,
-				customer: formData.customer,
-				profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null
+				product_type: formData.product_type
 			};
 
 			await investmentService.updateInvestment(editingInvestment.id, updates);
@@ -217,13 +205,8 @@
 			start_date: investment.start_date,
 			end_date: investment.end_date || '',
 			expected_return: investment.expected_return ? investment.expected_return.toString() : '',
-			current_received: investment.current_received ? investment.current_received.toString() : '0',
-			status: investment.status,
 			notes: investment.notes || '',
-			product_type: investment.product_type || '',
-			supplier: investment.supplier || '',
-			customer: investment.customer || '',
-			profit_margin: investment.profit_margin ? investment.profit_margin.toString() : ''
+			product_type: investment.product_type || ''
 		};
 		showEditModal = true;
 		showAddForm = false;
@@ -246,14 +229,39 @@
 			start_date: new Date().toISOString().split('T')[0],
 			end_date: '',
 			expected_return: '',
-			current_received: '',
-			status: 'active',
 			notes: '',
-			product_type: '',
-			supplier: '',
-			customer: '',
-			profit_margin: ''
+			product_type: ''
 		};
+	}
+
+	// NEW: Investment Type Selection
+	const investmentTypes = [
+		{ id: 'shipping', label: 'ค่าส่ง', emoji: 'มําของด่วน', color: 'from-amber-500 to-orange-500', bgColor: 'bg-amber-50' },
+		{ id: 'lisa', label: 'ค่าลิซ่า', emoji: 'จดหมายสีม่วง', color: 'from-pink-500 to-rose-500', bgColor: 'bg-pink-50' },
+		{ id: 'collab', label: 'ค่าคอลแลป', emoji: 'มือคลื่น', color: 'from-violet-500 to-purple-500', bgColor: 'bg-violet-50' },
+		{ id: 'other', label: 'ค่าอื่นๆ', emoji: 'กล่อง', color: 'from-slate-500 to-gray-600', bgColor: 'bg-slate-50' }
+	];
+
+	function openTypeSelector() {
+		resetForm();
+		showTypeSelector = true;
+		showAddForm = false;
+		showEditModal = false;
+		editingInvestment = null;
+		editModalInvestment = null;
+	}
+
+	function selectInvestmentType(typeId: string) {
+		const selectedType = investmentTypes.find(t => t.id === typeId);
+		if (selectedType) {
+			formData.product_type = selectedType.label;
+		}
+		showTypeSelector = false;
+		showAddForm = true;
+	}
+
+	function closeTypeSelector() {
+		showTypeSelector = false;
 	}
 
 	async function quickUpdateReceived(investment: { current_received: any; id: any }) {
@@ -330,10 +338,7 @@
 					current_received: 8000,
 					status: 'active',
 					notes: 'การลงทุนตัวอย่าง 1',
-					product_type: 'เสื้อผ้า',
-					supplier: 'ซัพพลายเออร์ A',
-					customer: 'Facebook',
-					profit_margin: 20
+					product_type: 'ค่าส่ง'
 				},
 				{
 					amount: 15000,
@@ -343,10 +348,7 @@
 					current_received: 18500,
 					status: 'completed',
 					notes: 'การลงทุนตัวอย่าง 2',
-					product_type: 'อิเล็กทรอนิกส์',
-					supplier: 'ซัพพลายเออร์ B',
-					customer: 'Shopee',
-					profit_margin: 25
+					product_type: 'ค่าลิซ่า'
 				},
 				{
 					amount: 8000,
@@ -356,10 +358,7 @@
 					current_received: 5000,
 					status: 'active',
 					notes: 'การลงทุนตัวอย่าง 3',
-					product_type: 'ของเล่น',
-					supplier: 'ซัพพลายเออร์ C',
-					customer: 'Lazada',
-					profit_margin: 18
+					product_type: 'ค่าคอลแลป'
 				}
 			];
 
@@ -440,8 +439,6 @@
 				const query = searchQuery.toLowerCase();
 				return (
 					(investment.product_type || '').toLowerCase().includes(query) ||
-					(investment.supplier || '').toLowerCase().includes(query) ||
-					(investment.customer || '').toLowerCase().includes(query) ||
 					(investment.notes || '').toLowerCase().includes(query) ||
 					investment.id.toString().includes(query)
 				);
@@ -451,9 +448,9 @@
 		})
 		.sort((a, b) => {
 			if (sortOrder === 'latest') {
-				return new Date(b.created_at || b.start_date).getTime() - new Date(a.created_at || a.start_date).getTime();
+				return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
 			} else if (sortOrder === 'oldest') {
-				return new Date(a.created_at || a.start_date).getTime() - new Date(b.created_at || b.start_date).getTime();
+				return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
 			} else if (sortOrder === 'amount_high') {
 				return parseFloat(b.amount) - parseFloat(a.amount);
 			} else if (sortOrder === 'amount_low') {
@@ -1179,14 +1176,15 @@
 							<button
 								class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-100 transition-all duration-300 hover:-translate-y-1 hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95"
 								on:click={() => {
-									showAddForm = !showAddForm;
-									showEditModal = false;
-									editingInvestment = null;
-									editModalInvestment = null;
-									if (showAddForm) resetForm();
+									if (showAddForm || showTypeSelector) {
+										showAddForm = false;
+										showTypeSelector = false;
+									} else {
+										openTypeSelector();
+									}
 								}}
 							>
-								{#if showAddForm}
+								{#if showAddForm || showTypeSelector}
 									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
 									Cancel
 								{:else}
@@ -1460,6 +1458,76 @@
 					</section>
 				{/if}
 
+				<!-- Investment Type Selector Popup -->
+				{#if showTypeSelector}
+					<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" on:click|self={closeTypeSelector}>
+						<div class="mx-4 w-full max-w-lg scale-100 transform rounded-3xl bg-white p-8 shadow-2xl transition-all">
+							<div class="mb-8 text-center">
+								<div class="mb-3 inline-flex items-center justify-center rounded-2xl bg-indigo-100 p-4">
+									<svg class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+									</svg>
+								</div>
+								<h3 class="text-2xl font-bold text-slate-800">เลือกประเภทการลงทุน</h3>
+								<p class="mt-1 text-sm text-slate-500">กรุณาเลือกประเภทของรายการนี้</p>
+							</div>
+							
+							<div class="grid grid-cols-2 gap-4">
+								<!-- ค่าส่ง -->
+								<button
+									class="group relative overflow-hidden rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-100"
+									on:click={() => selectInvestmentType('shipping')}
+								>
+									<div class="mb-3 text-4xl">📦</div>
+									<div class="text-lg font-bold text-amber-700">ค่าส่ง</div>
+									<div class="text-xs text-amber-600/70">ค่าขนส่ง, ค่าพัสดุ</div>
+									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-amber-200/30 transition-transform group-hover:scale-150"></div>
+								</button>
+								
+								<!-- ค่าลิซ่า -->
+								<button
+									class="group relative overflow-hidden rounded-2xl border-2 border-pink-200 bg-pink-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-pink-400 hover:shadow-lg hover:shadow-pink-100"
+									on:click={() => selectInvestmentType('lisa')}
+								>
+									<div class="mb-3 text-4xl">💌</div>
+									<div class="text-lg font-bold text-pink-700">ค่าลิซ่า</div>
+									<div class="text-xs text-pink-600/70">Lisa, LINE Delivery</div>
+									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-pink-200/30 transition-transform group-hover:scale-150"></div>
+								</button>
+								
+								<!-- ค่าคอลแลป -->
+								<button
+									class="group relative overflow-hidden rounded-2xl border-2 border-violet-200 bg-violet-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-violet-400 hover:shadow-lg hover:shadow-violet-100"
+									on:click={() => selectInvestmentType('collab')}
+								>
+									<div class="mb-3 text-4xl">🤝</div>
+									<div class="text-lg font-bold text-violet-700">ค่าคอลแลป</div>
+									<div class="text-xs text-violet-600/70">Collaboration, ร่วมมือ</div>
+									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-violet-200/30 transition-transform group-hover:scale-150"></div>
+								</button>
+								
+								<!-- ค่าอื่นๆ -->
+								<button
+									class="group relative overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-slate-400 hover:shadow-lg hover:shadow-slate-100"
+									on:click={() => selectInvestmentType('other')}
+								>
+									<div class="mb-3 text-4xl">📋</div>
+									<div class="text-lg font-bold text-slate-700">ค่าอื่นๆ</div>
+									<div class="text-xs text-slate-600/70">รายการทั่วไป</div>
+									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-slate-200/30 transition-transform group-hover:scale-150"></div>
+								</button>
+							</div>
+							
+							<button
+								class="mt-6 w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200"
+								on:click={closeTypeSelector}
+							>
+								ยกเลิก
+							</button>
+						</div>
+					</div>
+				{/if}
+
 				<!-- Add Investment Form -->
 				{#if showAddForm}
 					<section class="rounded-lg border border-pink-200 bg-white p-6 shadow-lg">
@@ -1469,6 +1537,20 @@
 									<span class="text-2xl">➕</span>
 									เพิ่มการลงทุนใหม่
 								</h3>
+								{#if formData.product_type}
+									<div class="mt-2 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold
+										{formData.product_type === 'ค่าส่ง' ? 'bg-amber-100 text-amber-700' : ''}
+										{formData.product_type === 'ค่าลิซ่า' ? 'bg-pink-100 text-pink-700' : ''}
+										{formData.product_type === 'ค่าคอลแลป' ? 'bg-violet-100 text-violet-700' : ''}
+										{formData.product_type === 'ค่าอื่นๆ' ? 'bg-slate-100 text-slate-700' : ''}
+									">
+										{formData.product_type === 'ค่าส่ง' ? '📦' : ''}
+										{formData.product_type === 'ค่าลิซ่า' ? '💌' : ''}
+										{formData.product_type === 'ค่าคอลแลป' ? '🤝' : ''}
+										{formData.product_type === 'ค่าอื่นๆ' ? '📋' : ''}
+										{formData.product_type}
+									</div>
+								{/if}
 							</div>
 
 							<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -1518,85 +1600,6 @@
 										id="expected_return"
 										bind:value={formData.expected_return}
 										placeholder="9600"
-										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-									/>
-								</div>
-
-								<div class="space-y-2">
-									<label for="current_received" class="block text-sm font-medium text-gray-700"
-										>เงินที่ได้รับแล้ว (บาท)</label
-									>
-									<input
-										type="number"
-										id="current_received"
-										bind:value={formData.current_received}
-										placeholder="0"
-										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-									/>
-								</div>
-
-								<div class="space-y-2">
-									<label for="status" class="block text-sm font-medium text-gray-700">สถานะ</label>
-									<select
-										id="status"
-										bind:value={formData.status}
-										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-									>
-										<option value="active">กำลังดำเนินการ</option>
-										<option value="completed">เสร็จสิ้น</option>
-										<option value="cancelled">ยกเลิก</option>
-									</select>
-								</div>
-
-								<div class="space-y-2">
-									<label for="product_type" class="block text-sm font-medium text-gray-700"
-										>ประเภทสินค้า</label
-									>
-									<input
-										type="text"
-										id="product_type"
-										bind:value={formData.product_type}
-										placeholder="เสื้อผ้า, อิเล็กทรอนิกส์, ของเล่น..."
-										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-									/>
-								</div>
-
-								<div class="space-y-2">
-									<label for="supplier" class="block text-sm font-medium text-gray-700"
-										>ซัพพลายเออร์/แหล่งซื้อ</label
-									>
-									<input
-										type="text"
-										id="supplier"
-										bind:value={formData.supplier}
-										placeholder="ชื่อร้าน, ผู้ผลิต..."
-										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-									/>
-								</div>
-
-								<div class="space-y-2">
-									<label for="customer" class="block text-sm font-medium text-gray-700"
-										>ลูกค้า/ช่องทางขาย</label
-									>
-									<input
-										type="text"
-										id="customer"
-										bind:value={formData.customer}
-										placeholder="Facebook, Shopee, ลูกค้าเก่า..."
-										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-									/>
-								</div>
-
-								<div class="space-y-2">
-									<label for="profit_margin" class="block text-sm font-medium text-gray-700"
-										>เปอร์เซ็นต์กำไรที่คาดหวัง (%)</label
-									>
-									<input
-										type="number"
-										id="profit_margin"
-										bind:value={formData.profit_margin}
-										placeholder="20"
-										step="0.01"
 										class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
 									/>
 								</div>
@@ -1858,89 +1861,49 @@
 										/>
 									</div>
 
-									<div class="space-y-2">
-										<label
-											for="edit-current-received"
-											class="block text-sm font-medium text-gray-700">เงินที่ได้รับแล้ว (บาท)</label
+									<div class="space-y-2 md:col-span-2">
+									<label class="block text-sm font-medium text-gray-700">ประเภทการลงทุน</label>
+									<div class="grid grid-cols-4 gap-2">
+										<button
+											type="button"
+											class="flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center transition-all {formData.product_type === 'ค่าส่ง' ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-200' : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'}"
+											on:click={() => formData.product_type = 'ค่าส่ง'}
 										>
-										<input
-											id="edit-current-received"
-											type="number"
-											bind:value={formData.current_received}
-											min="0"
-											placeholder="เช่น 5000"
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-										/>
+											<span class="text-2xl">📦</span>
+											<span class="text-xs font-semibold {formData.product_type === 'ค่าส่ง' ? 'text-amber-700' : 'text-gray-600'}">ค่าส่ง</span>
+										</button>
+										<button
+											type="button"
+											class="flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center transition-all {formData.product_type === 'ค่าลิซ่า' ? 'border-pink-400 bg-pink-50 ring-2 ring-pink-200' : 'border-gray-200 hover:border-pink-300 hover:bg-pink-50/50'}"
+											on:click={() => formData.product_type = 'ค่าลิซ่า'}
+										>
+											<span class="text-2xl">💌</span>
+											<span class="text-xs font-semibold {formData.product_type === 'ค่าลิซ่า' ? 'text-pink-700' : 'text-gray-600'}">ค่าลิซ่า</span>
+										</button>
+										<button
+											type="button"
+											class="flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center transition-all {formData.product_type === 'ค่าคอลแลป' ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-gray-200 hover:border-violet-300 hover:bg-violet-50/50'}"
+											on:click={() => formData.product_type = 'ค่าคอลแลป'}
+										>
+											<span class="text-2xl">🤝</span>
+											<span class="text-xs font-semibold {formData.product_type === 'ค่าคอลแลป' ? 'text-violet-700' : 'text-gray-600'}">ค่าคอลแลป</span>
+										</button>
+										<button
+											type="button"
+											class="flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center transition-all {formData.product_type === 'ค่าอื่นๆ' ? 'border-slate-400 bg-slate-50 ring-2 ring-slate-200' : 'border-gray-200 hover:border-slate-300 hover:bg-slate-50/50'}"
+											on:click={() => formData.product_type = 'ค่าอื่นๆ'}
+										>
+											<span class="text-2xl">📋</span>
+											<span class="text-xs font-semibold {formData.product_type === 'ค่าอื่นๆ' ? 'text-slate-700' : 'text-gray-600'}">ค่าอื่นๆ</span>
+										</button>
 									</div>
-
-									<div class="space-y-2">
-										<label for="edit-status" class="block text-sm font-medium text-gray-700"
-											>สถานะ</label
-										>
-										<select
-											id="edit-status"
-											bind:value={formData.status}
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-										>
-											<option value="active">กำลังดำเนินการ</option>
-											<option value="completed">เสร็จสิ้น</option>
-											<option value="cancelled">ยกเลิก</option>
-										</select>
-									</div>
-
-									<div class="space-y-2">
-										<label for="edit-product-type" class="block text-sm font-medium text-gray-700"
-											>ประเภทสินค้า</label
-										>
-										<input
-											id="edit-product-type"
-											type="text"
-											bind:value={formData.product_type}
-											placeholder="เช่น เสื้อผ้า, อิเล็กทรอนิกส์"
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<label for="edit-supplier" class="block text-sm font-medium text-gray-700"
-											>ซัพพลายเออร์</label
-										>
-										<input
-											id="edit-supplier"
-											type="text"
-											bind:value={formData.supplier}
-											placeholder="เช่น บริษัท ABC"
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<label for="edit-customer" class="block text-sm font-medium text-gray-700"
-											>ลูกค้า/แพลตฟอร์ม</label
-										>
-										<input
-											id="edit-customer"
-											type="text"
-											bind:value={formData.customer}
-											placeholder="เช่น Facebook, Shopee, Lazada"
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<label for="edit-profit-margin" class="block text-sm font-medium text-gray-700"
-											>กำไรต่อหน่วย (%)</label
-										>
-										<input
-											id="edit-profit-margin"
-											type="number"
-											bind:value={formData.profit_margin}
-											min="0"
-											step="0.01"
-											placeholder="เช่น 15.5"
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-										/>
-									</div>
+									<!-- Optional: Text input for custom type -->
+									{#if formData.product_type && !['ค่าส่ง', 'ค่าลิซ่า', 'ค่าคอลแลป', 'ค่าอื่นๆ'].includes(formData.product_type)}
+										<div class="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
+											⚠️ ประเภทเดิม: <strong>{formData.product_type}</strong> (กดเลือกด้านบนเพื่อเปลี่ยน)
+										</div>
+									{/if}
+								</div>
 
 									<div class="space-y-2 md:col-span-2">
 										<label for="edit-notes" class="block text-sm font-medium text-gray-700"
@@ -2034,11 +1997,6 @@
 									<div class="mb-2 lg:mb-0">
 										<h4 class="text-lg font-semibold text-gray-800">
 											{investment.product_type || 'การลงทุน'} #{investment.id}
-											{#if investment.supplier}
-												<small class="text-sm font-normal text-gray-500"
-													>จาก {investment.supplier}</small
-												>
-											{/if}
 										</h4>
 									</div>
 									<div>
@@ -2180,28 +2138,7 @@
 											{/if}
 										{/if}
 
-										{#if investment.customer}
-											<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
-												<span class="text-2xl">🛒</span>
-												<div>
-													<span class="block text-sm text-gray-600">ช่องทางขาย</span>
-													<span class="font-semibold text-gray-800">{investment.customer}</span>
-												</div>
-											</div>
-										{/if}
-
-										{#if investment.profit_margin}
-											<div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
-												<span class="text-2xl">📊</span>
-												<div>
-													<span class="block text-sm text-gray-600">กำไรคาดหวัง</span>
-													<span class="font-semibold text-gray-800"
-														>{investment.profit_margin}%</span
-													>
-												</div>
-											</div>
-										{/if}
-									</div>
+										</div>
 
 									{#if investment.notes}
 										<div
@@ -2452,26 +2389,14 @@
 											<!-- Details -->
 											<div class="mt-3 border-t border-gray-200 pt-3">
 												<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-													{#if log.investments}
-														<div class="flex items-center gap-1">
-															<span class="text-gray-500">🏷️ การลงทุน:</span>
-															<span class="font-medium">
-																{log.investments.product_type || `#${log.investment_id}`}
-															</span>
-														</div>
-														{#if log.investments.supplier}
-															<div class="flex items-center gap-1">
-																<span class="text-gray-500">🏭 Supplier:</span>
-																<span class="font-medium">{log.investments.supplier}</span>
-															</div>
-														{/if}
-														{#if log.investments.customer}
-															<div class="flex items-center gap-1">
-																<span class="text-gray-500">🛒 Customer:</span>
-																<span class="font-medium">{log.investments.customer}</span>
-															</div>
-														{/if}
-													{/if}
+														{#if log.investments}
+											<div class="flex items-center gap-1">
+												<span class="text-gray-500">🏷️ การลงทุน:</span>
+												<span class="font-medium">
+													{log.investments.product_type || `#${log.investment_id}`}
+												</span>
+											</div>
+										{/if}
 												</div>
 												{#if log.notes}
 													<p class="mt-2 text-sm text-gray-600">
@@ -2555,19 +2480,6 @@
 														<div class="text-sm font-medium text-gray-900">
 															{log.investments?.product_type || `#${log.investment_id}`}
 														</div>
-														{#if log.investments?.supplier || log.investments?.customer}
-															<div class="text-xs text-gray-500">
-																{#if log.investments?.supplier}
-																	<span>🏭 {log.investments.supplier}</span>
-																{/if}
-																{#if log.investments?.supplier && log.investments?.customer}
-																	<span class="mx-1">•</span>
-																{/if}
-																{#if log.investments?.customer}
-																	<span>🛒 {log.investments.customer}</span>
-																{/if}
-															</div>
-														{/if}
 													</td>
 
 													<!-- จำนวนเงิน -->
