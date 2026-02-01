@@ -540,12 +540,19 @@
 					Pre-orders
 				</button>
 				<button
+					class="w-20 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-28 sm:text-sm text-slate-500 hover:text-slate-700"
+					onclick={() => goto('/backoffice/investments')}
+				>
+					Investments
+				</button>
+				<button
 					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-24 sm:text-sm text-slate-500 hover:text-slate-700"
 					onclick={() => goto('/backoffice/settings')}
 				>
 					Settings
 				</button>
 			</div>
+
 
 			<button
 				onclick={() => {
