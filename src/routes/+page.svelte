@@ -24,6 +24,7 @@
 	// Transaction History state
 	let showTransactionHistory = false;
 	let transactionLogs: any[] = [];
+	let allTransactionLogs: any[] = [];
 	let transactionLoading = false;
 	let selectedInvestmentForLogs: number | null = null;
 	let transactionViewMode: 'card' | 'table' = 'card'; // 'card' หรือ 'table'
@@ -31,6 +32,14 @@
 	// Filter state
 	let filterStatus = 'all';
 	let searchQuery = '';
+
+	// Period Summary state
+	let periodViewMode = 'monthly'; // 'weekly' | 'monthly'
+	let periodSortField = 'period'; // 'period' | 'invested' | 'received' | 'profit' | 'roi' | 'count'
+	let periodSortDirection = 'desc'; // 'asc' | 'desc'
+	let sortOrder = 'latest'; // 'latest' | 'oldest' | 'amount_high' | 'amount_low'
+	let summaryType = 'investments'; // 'investments' | 'logs'
+
 
 	// Form data
 	let formData = {
@@ -105,17 +114,24 @@
 	async function loadInvestments() {
 		try {
 			loading = true;
-			investments = await investmentService.getInvestments();
-			console.log('Loaded investments:', investments); // Debug log
+			const [investmentsData, logsData] = await Promise.all([
+				investmentService.getInvestments(),
+				investmentLogService.getLogs(null)
+			]);
+			investments = investmentsData;
+			allTransactionLogs = logsData;
+			console.log('Loaded investments:', investments); 
+			console.log('Loaded all logs:', allTransactionLogs);
 			loading = false;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
-			console.error('Error loading investments:', err); // Debug log
+			console.error('Error loading investments:', err);
 			loading = false;
 		}
 	}
 
 	async function addInvestment() {
+
 		try {
 			if (!formData.amount || !formData.start_date) {
 				error = 'กรุณากรอกจำนวนเงินและวันที่เริ่มต้น';
@@ -411,27 +427,184 @@
 	$: completedInvestments = investments.filter((inv) => inv.status === 'completed');
 	$: overallROI = totalInvested > 0 ? ((totalReceived - totalInvested) / totalInvested) * 100 : 0;
 
-	// Filtered investments
-	$: filteredInvestments = investments.filter((investment) => {
-		// Filter by status
-		if (filterStatus !== 'all' && investment.status !== filterStatus) {
-			return false;
+	// Filtered and Sorted investments
+	$: filteredInvestments = investments
+		.filter((investment) => {
+			// Filter by status
+			if (filterStatus !== 'all' && investment.status !== filterStatus) {
+				return false;
+			}
+
+			// Filter by search query
+			if (searchQuery.trim()) {
+				const query = searchQuery.toLowerCase();
+				return (
+					(investment.product_type || '').toLowerCase().includes(query) ||
+					(investment.supplier || '').toLowerCase().includes(query) ||
+					(investment.customer || '').toLowerCase().includes(query) ||
+					(investment.notes || '').toLowerCase().includes(query) ||
+					investment.id.toString().includes(query)
+				);
+			}
+
+			return true;
+		})
+		.sort((a, b) => {
+			if (sortOrder === 'latest') {
+				return new Date(b.created_at || b.start_date).getTime() - new Date(a.created_at || a.start_date).getTime();
+			} else if (sortOrder === 'oldest') {
+				return new Date(a.created_at || a.start_date).getTime() - new Date(b.created_at || b.start_date).getTime();
+			} else if (sortOrder === 'amount_high') {
+				return parseFloat(b.amount) - parseFloat(a.amount);
+			} else if (sortOrder === 'amount_low') {
+				return parseFloat(a.amount) - parseFloat(b.amount);
+			}
+			return 0;
+		});
+
+	// Period Summaries (รายเดือน/รายสัปดาห์)
+	interface PeriodSummary {
+		period: string;
+		periodLabel: string;
+		invested: number;
+		received: number;
+		profit: number;
+		roi: number;
+		count: number;
+	}
+
+	$: periodSummaries = (() => {
+		const summaries = new Map<string, PeriodSummary>();
+
+		if (summaryType === 'investments') {
+			investments.forEach((inv) => {
+				const date = new Date(inv.start_date);
+				let period: string;
+				let periodLabel: string;
+
+				if (periodViewMode === 'weekly') {
+					const startOfYear = new Date(date.getFullYear(), 0, 1);
+					const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+					const weekNum = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
+					period = `${date.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+					periodLabel = `สัปดาห์ที่ ${weekNum}, ${date.getFullYear()}`;
+				} else {
+					period = inv.start_date.substring(0, 7); // YYYY-MM
+					const monthNames = [
+						'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+						'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+					];
+					periodLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+				}
+
+				if (!summaries.has(period)) {
+					summaries.set(period, {
+						period, periodLabel, invested: 0, received: 0, profit: 0, roi: 0, count: 0
+					});
+				}
+
+				const summary = summaries.get(period)!;
+				summary.invested += parseFloat(inv.amount);
+				summary.received += parseFloat(inv.current_received || 0);
+				summary.count += 1;
+			});
+		} else {
+			// Summary from Logs (Cash Flow)
+			allTransactionLogs.forEach((log) => {
+				const date = new Date(log.transaction_date);
+				let period: string;
+				let periodLabel: string;
+
+				if (periodViewMode === 'weekly') {
+					const startOfYear = new Date(date.getFullYear(), 0, 1);
+					const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+					const weekNum = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
+					period = `${date.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+					periodLabel = `สัปดาห์ที่ ${weekNum}, ${date.getFullYear()}`;
+				} else {
+					const month = (date.getMonth() + 1).toString().padStart(2, '0');
+					period = `${date.getFullYear()}-${month}`;
+					const monthNames = [
+						'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+						'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+					];
+					periodLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+				}
+
+				if (!summaries.has(period)) {
+					summaries.set(period, {
+						period, periodLabel, invested: 0, received: 0, profit: 0, roi: 0, count: 0
+					});
+				}
+
+				const summary = summaries.get(period)!;
+				if (log.type === 'initial_investment') {
+					summary.invested += Math.abs(parseFloat(log.amount));
+				} else if (log.type === 'deposit') {
+					summary.received += parseFloat(log.amount);
+				} else if (log.type === 'withdrawal') {
+					summary.received -= parseFloat(log.amount);
+				}
+				summary.count += 1;
+
+			});
 		}
 
-		// Filter by search query
-		if (searchQuery.trim()) {
-			const query = searchQuery.toLowerCase();
-			return (
-				(investment.product_type || '').toLowerCase().includes(query) ||
-				(investment.supplier || '').toLowerCase().includes(query) ||
-				(investment.customer || '').toLowerCase().includes(query) ||
-				(investment.notes || '').toLowerCase().includes(query) ||
-				investment.id.toString().includes(query)
-			);
-		}
+		// Calculate profit and ROI
+		summaries.forEach((summary) => {
+			summary.profit = summary.received - summary.invested;
+			summary.roi = summary.invested > 0 ? ((summary.received - summary.invested) / summary.invested) * 100 : 0;
+		});
 
-		return true;
-	});
+		// Sort
+		let sortedArray = Array.from(summaries.values());
+		sortedArray.sort((a, b) => {
+			let comparison = 0;
+			switch (periodSortField) {
+				case 'period':
+					comparison = a.period.localeCompare(b.period);
+					break;
+				case 'invested':
+					comparison = a.invested - b.invested;
+					break;
+				case 'received':
+					comparison = a.received - b.received;
+					break;
+				case 'profit':
+					comparison = a.profit - b.profit;
+					break;
+				case 'roi':
+					comparison = a.roi - b.roi;
+					break;
+				case 'count':
+					comparison = a.count - b.count;
+					break;
+			}
+			return periodSortDirection === 'asc' ? comparison : -comparison;
+		});
+
+		return sortedArray;
+	})();
+
+	// Period Totals
+	$: periodTotals = {
+		invested: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0),
+		received: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.received, 0),
+		profit: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.profit, 0),
+		count: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.count, 0),
+		roi: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0) > 0 
+			? ((periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.received, 0) - periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0)) / periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0)) * 100 
+			: 0
+	};
+
+	function togglePeriodSort(field: 'period' | 'invested' | 'received' | 'profit' | 'roi' | 'count') {
+		if (periodSortField === field) {
+			periodSortDirection = periodSortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			periodSortField = field;
+			periodSortDirection = 'desc';
+		}
+	}
 
 	// ข้อมูลสำหรับกราฟ
 	$: chartData = {
@@ -722,169 +895,228 @@
 
 		<main class="py-10">
 			<div class="mx-auto max-w-6xl px-4">
-				<!-- Summary Cards -->
-				<section class="mb-12">
-					<h2 class="mb-6 flex items-center gap-2 text-xl font-bold text-slate-800">
-						<span class="inline-block h-6 w-1 rounded-full bg-indigo-500"></span>
-						Overview
-					</h2>
-					<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-						<div
-							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-						>
-							<div
-								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 transition-colors duration-300 group-hover:bg-indigo-600 group-hover:text-white"
-							>
-								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-									/>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-									Total Invested
-								</h3>
-								<p class="text-2xl font-bold text-slate-900">{totalInvested.toLocaleString()}</p>
-								<span class="text-xs text-slate-400">THB</span>
-							</div>
-						</div>
-
-						<div
-							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-						>
-							<div
-								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 transition-colors duration-300 group-hover:bg-emerald-600 group-hover:text-white"
-							>
-								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-									/>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-									Total Received
-								</h3>
-								<p class="text-2xl font-bold text-emerald-600">{totalReceived.toLocaleString()}</p>
-								<span class="text-xs text-slate-400">THB</span>
-							</div>
-						</div>
-
-						<div
-							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-						>
-							<div
-								class="h-14 w-14 {totalProfit >= 0
-									? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600'
-									: 'bg-red-50 text-red-600 group-hover:bg-red-600'} flex items-center justify-center rounded-2xl transition-colors duration-300 group-hover:text-white"
-							>
-								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-									/>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-									Net Profit
-								</h3>
-								<p
-									class="text-2xl font-bold {totalProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}"
+				<!-- Period Summary Section (Now as Overview) -->
+				<section class="mb-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+					<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+						<h2 class="flex items-center gap-2 text-xl font-bold text-slate-800">
+							<span class="inline-block h-6 w-1 rounded-full bg-indigo-500"></span>
+							Overview Summary
+						</h2>
+						
+						<!-- Toggle Weekly/Monthly -->
+						<div class="flex items-center gap-4">
+							<!-- Summary Type Toggle -->
+							<div class="flex rounded-xl bg-slate-100 p-1">
+								<button
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {summaryType === 'investments'
+										? 'bg-white text-indigo-600 shadow-sm'
+										: 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (summaryType = 'investments')}
 								>
-									{totalProfit >= 0 ? '+' : ''}{totalProfit.toLocaleString()}
-								</p>
-								<span class="text-xs text-slate-400">THB</span>
-							</div>
-						</div>
-
-						<div
-							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-						>
-							<div
-								class="h-14 w-14 {overallROI >= 0
-									? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600'
-									: 'bg-red-50 text-red-600 group-hover:bg-red-600'} flex items-center justify-center rounded-2xl transition-colors duration-300 group-hover:text-white"
-							>
-								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-									/>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-									Overall ROI
-								</h3>
-								<p
-									class="text-2xl font-bold {overallROI >= 0 ? 'text-indigo-600' : 'text-red-600'}"
+									📂 Investment
+								</button>
+								<button
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {summaryType === 'logs'
+										? 'bg-white text-indigo-600 shadow-sm'
+										: 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (summaryType = 'logs')}
 								>
-									{overallROI >= 0 ? '+' : ''}{overallROI.toFixed(1)}
-								</p>
-								<span class="text-xs text-slate-400">%</span>
+									💸 Cash Flow
+								</button>
 							</div>
-						</div>
 
-						<div
-							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-						>
-							<div
-								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 transition-colors duration-300 group-hover:bg-orange-600 group-hover:text-white"
-							>
-								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-									/>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-									Active Deals
-								</h3>
-								<p class="text-2xl font-bold text-orange-600">{activeInvestments.length}</p>
-								<span class="text-xs text-slate-400">In Progress</span>
-							</div>
-						</div>
+							<div class="h-6 w-px bg-slate-200"></div>
 
-						<div
-							class="group flex items-center gap-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-						>
-							<div
-								class="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 text-green-600 transition-colors duration-300 group-hover:bg-green-600 group-hover:text-white"
-							>
-								<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-									/>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-									Completed
-								</h3>
-								<p class="text-2xl font-bold text-green-600">{completedInvestments.length}</p>
-								<span class="text-xs text-slate-400">Success</span>
+							<div class="flex rounded-xl bg-slate-100 p-1">
+								<button
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {periodViewMode === 'weekly'
+										? 'bg-white text-teal-600 shadow-sm'
+										: 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (periodViewMode = 'weekly')}
+								>
+									📅 Weekly
+								</button>
+								<button
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {periodViewMode === 'monthly'
+										? 'bg-white text-teal-600 shadow-sm'
+										: 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (periodViewMode = 'monthly')}
+								>
+									📆 Monthly
+								</button>
 							</div>
 						</div>
 					</div>
+
+					<div class="mb-6 rounded-xl bg-indigo-50/50 p-4 ring-1 ring-indigo-100">
+						<p class="text-xs font-bold text-indigo-900">
+							{#if summaryType === 'investments'}
+								🔍 สรุปตามวันที่เริ่มลงทุน (Investment Date): จะนับยอดเงินลงทุนและรับคืนทั้งหมดของโปรเจกต์นั้นๆ ลงในเดือนที่เริ่มโปรเจกต์
+							{:else}
+								🔍 สรุปตามการเคลื่อนไหวของเงิน (Actual Cash Flow Log): จะนับยอดเงินลงทุนและรับคืนตามวันที่บันทึก Log จริง (เห็นเงินเข้าเงินออกรายเดือนที่ชัดเจนกว่า)
+							{/if}
+						</p>
+					</div>
+
+					<!-- Summary Cards -->
+					<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+						<div class="rounded-xl bg-slate-50 p-4">
+							<div class="mb-1 text-xs font-medium text-slate-500">💰 ลงทุนรวม</div>
+							<div class="text-xl font-bold text-slate-900">฿{periodTotals.invested.toLocaleString()}</div>
+						</div>
+						<div class="rounded-xl bg-slate-50 p-4">
+							<div class="mb-1 text-xs font-medium text-slate-500">💵 รับคืนรวม</div>
+							<div class="text-xl font-bold text-emerald-600">฿{periodTotals.received.toLocaleString()}</div>
+						</div>
+						<div class="rounded-xl bg-slate-50 p-4">
+							<div class="mb-1 text-xs font-medium text-slate-500">📈 กำไร/ขาดทุน</div>
+							<div class="text-xl font-bold {periodTotals.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+								{periodTotals.profit >= 0 ? '+' : ''}฿{periodTotals.profit.toLocaleString()}
+							</div>
+						</div>
+						<div class="rounded-xl bg-slate-50 p-4">
+							<div class="mb-1 text-xs font-medium text-slate-500">📊 ROI เฉลี่ย</div>
+							<div class="text-xl font-bold {periodTotals.roi >= 0 ? 'text-indigo-600' : 'text-rose-600'}">
+								{periodTotals.roi >= 0 ? '+' : ''}{periodTotals.roi.toFixed(2)}%
+							</div>
+						</div>
+					</div>
+
+					<!-- Data Table -->
+					{#if periodSummaries.length > 0}
+						<div class="overflow-x-auto rounded-xl border border-slate-200">
+							<table class="w-full">
+								<thead>
+									<tr class="border-b border-slate-100 bg-slate-50/50">
+										<th class="px-4 py-3 text-left">
+											<button
+												class="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+												on:click={() => togglePeriodSort('period')}
+											>
+												ช่วงเวลา
+												{#if periodSortField === 'period'}
+													<span class="text-teal-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+										</th>
+										<th class="px-4 py-3 text-right">
+											<button
+												class="flex items-center justify-end gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+												on:click={() => togglePeriodSort('count')}
+											>
+												จำนวน
+												{#if periodSortField === 'count'}
+													<span class="text-teal-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+										</th>
+										<th class="px-4 py-3 text-right">
+											<button
+												class="flex items-center justify-end gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+												on:click={() => togglePeriodSort('invested')}
+											>
+												ลงทุน
+												{#if periodSortField === 'invested'}
+													<span class="text-teal-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+										</th>
+										<th class="px-4 py-3 text-right">
+											<button
+												class="flex items-center justify-end gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+												on:click={() => togglePeriodSort('received')}
+											>
+												รับคืน
+												{#if periodSortField === 'received'}
+													<span class="text-teal-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+										</th>
+										<th class="px-4 py-3 text-right">
+											<button
+												class="flex items-center justify-end gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+												on:click={() => togglePeriodSort('profit')}
+											>
+												กำไร/ขาดทุน
+												{#if periodSortField === 'profit'}
+													<span class="text-teal-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+										</th>
+										<th class="px-4 py-3 text-right">
+											<button
+												class="flex items-center justify-end gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+												on:click={() => togglePeriodSort('roi')}
+											>
+												ROI
+												{#if periodSortField === 'roi'}
+													<span class="text-teal-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+										</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-slate-100">
+									{#each periodSummaries as summary (summary.period)}
+										<tr class="transition-colors hover:bg-slate-50/50">
+											<td class="px-4 py-3">
+												<div class="font-bold text-slate-900">{summary.periodLabel}</div>
+												<div class="text-xs text-slate-400">{summary.period}</div>
+											</td>
+											<td class="px-4 py-3 text-right">
+												<span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+													{summary.count} รายการ
+												</span>
+											</td>
+											<td class="px-4 py-3 text-right font-medium text-slate-700">
+												฿{summary.invested.toLocaleString()}
+											</td>
+											<td class="px-4 py-3 text-right font-medium text-emerald-600">
+												฿{summary.received.toLocaleString()}
+											</td>
+											<td class="px-4 py-3 text-right font-bold {summary.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+												{summary.profit >= 0 ? '+' : ''}฿{summary.profit.toLocaleString()}
+											</td>
+											<td class="px-4 py-3 text-right">
+												<span
+													class="rounded-full px-2 py-1 text-xs font-bold {summary.roi >= 0
+														? 'bg-emerald-50 text-emerald-700'
+														: 'bg-rose-50 text-rose-700'}"
+												>
+													{summary.roi >= 0 ? '+' : ''}{summary.roi.toFixed(2)}%
+												</span>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+								<tfoot>
+									<tr class="border-t-2 border-slate-200 bg-slate-50 font-bold">
+										<td class="px-4 py-3 text-slate-900">รวมทั้งหมด</td>
+										<td class="px-4 py-3 text-right text-slate-700">{periodTotals.count} รายการ</td>
+										<td class="px-4 py-3 text-right text-slate-900">฿{periodTotals.invested.toLocaleString()}</td>
+										<td class="px-4 py-3 text-right text-emerald-600">฿{periodTotals.received.toLocaleString()}</td>
+										<td class="px-4 py-3 text-right {periodTotals.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+											{periodTotals.profit >= 0 ? '+' : ''}฿{periodTotals.profit.toLocaleString()}
+										</td>
+										<td class="px-4 py-3 text-right">
+											<span
+												class="rounded-full px-2 py-1 text-xs font-bold {periodTotals.roi >= 0
+													? 'bg-indigo-100 text-indigo-700'
+													: 'bg-rose-100 text-rose-700'}"
+											>
+												{periodTotals.roi >= 0 ? '+' : ''}{periodTotals.roi.toFixed(2)}%
+											</span>
+										</td>
+									</tr>
+								</tfoot>
+							</table>
+						</div>
+					{:else}
+						<div class="rounded-xl bg-slate-50 p-8 text-center">
+							<div class="mb-2 text-4xl">📭</div>
+							<p class="text-slate-500">ยังไม่มีข้อมูลการลงทุน</p>
+						</div>
+					{/if}
 				</section>
 
 				{#if error}
@@ -896,82 +1128,134 @@
 					</div>
 				{/if}
 
-				<!-- Action Bar -->
-				<section class="mb-12">
-					<div class="flex flex-wrap gap-4">
-						<button
-							class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-lg"
-							on:click={() => {
-								showAddForm = !showAddForm;
-								showEditModal = false;
-								editingInvestment = null;
-								editModalInvestment = null;
-								if (showAddForm) resetForm();
-							}}
-						>
-							<span>{showAddForm ? '❌' : '➕'}</span>
-							{showAddForm ? 'Cancel' : 'Add Investment'}
-						</button>
+				<!-- Action Bar Renovated -->
+				<section class="mb-10">
+					<div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+						<div class="flex flex-wrap items-center gap-3">
+							<button
+								class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-100 transition-all duration-300 hover:-translate-y-1 hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95"
+								on:click={() => {
+									showAddForm = !showAddForm;
+									showEditModal = false;
+									editingInvestment = null;
+									editModalInvestment = null;
+									if (showAddForm) resetForm();
+								}}
+							>
+								{#if showAddForm}
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+									Cancel
+								{:else}
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
+									Add Investment
+								{/if}
+							</button>
 
-						<button
-							class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-6 py-3 font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-lg"
-							on:click={() => (showCharts = !showCharts)}
-						>
-							<span>📊</span>
-							{showCharts ? 'Hide Charts' : 'Show Charts'}
-						</button>
+							<div class="flex items-center gap-2 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+								<button
+									class="flex h-10 items-center gap-2 rounded-lg px-4 text-xs font-bold transition-all {showCharts ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}"
+									on:click={() => (showCharts = !showCharts)}
+								>
+									📊 {showCharts ? 'Hide Charts' : 'Charts'}
+								</button>
+								<div class="h-4 w-px bg-slate-200"></div>
+								<button
+									class="flex h-10 items-center gap-2 rounded-lg px-4 text-xs font-bold transition-all {showTransactionHistory ? 'bg-purple-50 text-purple-600' : 'text-slate-500 hover:bg-slate-50'}"
+									on:click={() => openTransactionHistory(null)}
+								>
+									📜 Logs
+								</button>
+							</div>
+						</div>
 
-						<button
-							class="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-purple-700 hover:shadow-lg"
-							on:click={() => openTransactionHistory(null)}
-						>
-							<span>📜</span>
-							Transactions
-						</button>
-
-						<!-- Quick Filter Buttons -->
-						<div class="ml-auto flex flex-wrap gap-2">
-							<button
-								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'all'
-									? 'bg-indigo-600 text-white'
-									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-								on:click={() => (filterStatus = 'all')}
-							>
-								<span>📋</span>
-								All
-							</button>
-							<button
-								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'active'
-									? 'bg-orange-500 text-white'
-									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-								on:click={() => (filterStatus = 'active')}
-							>
-								<span>🔄</span>
-								Active
-							</button>
-							<button
-								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'completed'
-									? 'bg-green-600 text-white'
-									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-								on:click={() => (filterStatus = 'completed')}
-							>
-								<span>✅</span>
-								Completed
-							</button>
-							<button
-								class="inline-flex items-center gap-2 px-4 py-2 {filterStatus === 'cancelled'
-									? 'bg-red-500 text-white'
-									: 'bg-slate-200 text-slate-700 hover:bg-slate-300'} rounded-md font-medium transition-colors duration-200"
-								on:click={() => (filterStatus = 'cancelled')}
-							>
-								<span>❌</span>
-								Cancelled
-							</button>
+						<div class="flex items-center gap-3">
+							<span class="text-xs font-bold uppercase tracking-widest text-slate-400">Filter Status</span>
+							<div class="flex rounded-xl bg-slate-100 p-1.5 shadow-inner">
+								<button
+									class="rounded-lg px-4 py-2 text-xs font-bold transition-all {filterStatus === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (filterStatus = 'all')}
+								>
+									All
+								</button>
+								<button
+									class="rounded-lg px-4 py-2 text-xs font-bold transition-all {filterStatus === 'active' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (filterStatus = 'active')}
+								>
+									Active
+								</button>
+								<button
+									class="rounded-lg px-4 py-2 text-xs font-bold transition-all {filterStatus === 'completed' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (filterStatus = 'completed')}
+								>
+									Completed
+								</button>
+								<button
+									class="rounded-lg px-4 py-2 text-xs font-bold transition-all {filterStatus === 'cancelled' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}"
+									on:click={() => (filterStatus = 'cancelled')}
+								>
+									Cancelled
+								</button>
+							</div>
 						</div>
 					</div>
 				</section>
 
+				<!-- Search & Filter Bar Renovated -->
+				<section class="mb-8 rounded-[2rem] bg-indigo-900/5 p-6 backdrop-blur-sm">
+					<div class="flex flex-col gap-4 md:flex-row md:items-center">
+						<div class="flex-shrink-0">
+							<span class="flex items-center gap-2 text-sm font-bold text-indigo-900">
+								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+								Quick Search
+							</span>
+						</div>
+						<div class="relative flex-1">
+							<input
+								type="text"
+								bind:value={searchQuery}
+								placeholder="Search by ID, Product Type, Supplier, Customer..."
+								class="w-full rounded-2xl border-0 bg-white py-4 pl-12 pr-4 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-200 transition-all placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600"
+							/>
+							<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+								<div class="h-2 w-2 rounded-full bg-indigo-600"></div>
+							</div>
+						</div>
+
+						<!-- Sort Options -->
+						<div class="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+							<div class="flex items-center gap-1 overflow-x-auto whitespace-nowrap p-1">
+								<button
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'latest' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									on:click={() => (sortOrder = 'latest')}
+								>
+									Latest
+								</button>
+								<button
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'oldest' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									on:click={() => (sortOrder = 'oldest')}
+								>
+									Oldest
+								</button>
+								<button
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'amount_high' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									on:click={() => (sortOrder = 'amount_high')}
+								>
+									฿ High
+								</button>
+								<button
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'amount_low' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									on:click={() => (sortOrder = 'amount_low')}
+								>
+									฿ Low
+								</button>
+							</div>
+						</div>
+					</div>
+				</section>
+
+
 				<!-- Charts Section -->
+
 				{#if showCharts}
 					<section class="charts-section">
 						<h2 class="section-title">📈 Analytics and Statistics</h2>
@@ -1658,64 +1942,18 @@
 					</section>
 				{:else}
 					<section class="space-y-6">
-						<!-- Filter Section -->
-						<div class="rounded-lg border border-pink-200 bg-white p-6 shadow-lg">
-							<div class="flex flex-col gap-4">
-								<!-- Header -->
-								<div class="flex items-center gap-2 text-lg font-medium text-gray-700">
-									<span>🔍</span>
-									<span>กรองและค้นหา</span>
-								</div>
-
-								<!-- Filters Container -->
-								<div class="flex flex-col gap-4 sm:flex-row">
-									<!-- Status Filter -->
-									<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-										<label
-											for="status-filter"
-											class="whitespace-nowrap text-sm font-medium text-gray-600">สถานะ:</label
-										>
-										<select
-											id="status-filter"
-											bind:value={filterStatus}
-											class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500 sm:w-auto"
-										>
-											<option value="all">ทั้งหมด</option>
-											<option value="active">กำลังดำเนินการ</option>
-											<option value="completed">เสร็จสิ้น</option>
-											<option value="cancelled">ยกเลิก</option>
-										</select>
-									</div>
-
-									<!-- Search Input -->
-									<div class="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-										<label
-											for="search-input"
-											class="whitespace-nowrap text-sm font-medium text-gray-600">ค้นหา:</label
-										>
-										<div class="flex flex-1 items-center gap-2">
-											<input
-												id="search-input"
-												type="text"
-												bind:value={searchQuery}
-												placeholder="ค้นหาจาก ID, ประเภทสินค้า..."
-												class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-											/>
-											{#if searchQuery}
-												<button
-													on:click={() => (searchQuery = '')}
-													class="flex-shrink-0 px-3 py-2 text-gray-500 transition-colors hover:text-gray-700"
-													title="ล้างการค้นหา"
-												>
-													<span class="text-lg">✕</span>
-												</button>
-											{/if}
-										</div>
-									</div>
-								</div>
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-3">
+								<span class="text-xl">📋</span>
+								<h2 class="text-xl font-bold text-gray-800">การลงทุนทั้งหมด ({filteredInvestments.length})</h2>
 							</div>
+							<div class="text-sm font-medium text-slate-500">
+								Showing {filteredInvestments.length} from {investments.length} items
+							</div>
+						</div>
 
 							<!-- Filter Results Info -->
+
 							<div class="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
 								<span
 									>แสดงผล: <strong class="text-pink-600">{filteredInvestments.length}</strong> จาก
@@ -1736,14 +1974,8 @@
 									</span>
 								{/if}
 							</div>
-						</div>
 
-						<div class="flex items-center justify-between">
-							<h2 class="flex items-center gap-2 text-2xl font-bold text-gray-800">
-								<span class="text-2xl">📋</span>
-								การลงทุนทั้งหมด ({filteredInvestments.length})
-							</h2>
-						</div>
+
 
 						{#each filteredInvestments as investment (investment.id)}
 							<div
