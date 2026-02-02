@@ -43,7 +43,6 @@
 	let summaryType = 'investments'; // 'investments' | 'logs'
 	let showMobilePeriodSummaries = false; // NEW: Toggle monthly cards on mobile
 
-
 	// Form data
 	let formData = {
 		amount: '',
@@ -118,7 +117,7 @@
 			]);
 			investments = investmentsData;
 			allTransactionLogs = logsData;
-			console.log('Loaded investments:', investments); 
+			console.log('Loaded investments:', investments);
 			console.log('Loaded all logs:', allTransactionLogs);
 			loading = false;
 		} catch (err) {
@@ -129,7 +128,6 @@
 	}
 
 	async function addInvestment() {
-
 		try {
 			if (!formData.amount || !formData.start_date) {
 				error = 'กรุณากรอกจำนวนเงินและวันที่เริ่มต้น';
@@ -238,10 +236,41 @@
 
 	// NEW: Investment Type Selection
 	const investmentTypes = [
-		{ id: 'shipping', label: 'ค่าส่ง', emoji: 'มําของด่วน', color: 'from-amber-500 to-orange-500', bgColor: 'bg-amber-50' },
-		{ id: 'lisa', label: 'ค่าลิซ่า', emoji: 'จดหมายสีม่วง', color: 'from-pink-500 to-rose-500', bgColor: 'bg-pink-50' },
-		{ id: 'collab', label: 'ค่าคอลแลป', emoji: 'มือคลื่น', color: 'from-violet-500 to-purple-500', bgColor: 'bg-violet-50' },
-		{ id: 'other', label: 'ค่าอื่นๆ', emoji: 'กล่อง', color: 'from-slate-500 to-gray-600', bgColor: 'bg-slate-50' }
+		{
+			id: 'investment',
+			label: 'ค่าลงทุน',
+			emoji: '💰',
+			color: 'from-emerald-500 to-teal-500',
+			bgColor: 'bg-emerald-50'
+		},
+		{
+			id: 'shipping',
+			label: 'ค่าส่ง',
+			emoji: '📦',
+			color: 'from-amber-500 to-orange-500',
+			bgColor: 'bg-amber-50'
+		},
+		{
+			id: 'lisa',
+			label: 'ค่าลิซ่า',
+			emoji: '💌',
+			color: 'from-pink-500 to-rose-500',
+			bgColor: 'bg-pink-50'
+		},
+		{
+			id: 'collab',
+			label: 'ค่าคอลแลป',
+			emoji: '🤝',
+			color: 'from-violet-500 to-purple-500',
+			bgColor: 'bg-violet-50'
+		},
+		{
+			id: 'other',
+			label: 'ค่าอื่นๆ',
+			emoji: '📋',
+			color: 'from-slate-500 to-gray-600',
+			bgColor: 'bg-slate-50'
+		}
 	];
 
 	function openTypeSelector() {
@@ -254,7 +283,7 @@
 	}
 
 	function selectInvestmentType(typeId: string) {
-		const selectedType = investmentTypes.find(t => t.id === typeId);
+		const selectedType = investmentTypes.find((t) => t.id === typeId);
 		if (selectedType) {
 			formData.product_type = selectedType.label;
 		}
@@ -437,8 +466,11 @@
 			}
 
 			// Filter by product type
-			if (filterProductType !== 'all' && investment.product_type !== filterProductType) {
-				return false;
+			if (filterProductType !== 'all') {
+				const investmentType = investment.product_type || 'ค่าลงทุน'; // Default to 'ค่าลงทุน' if empty
+				if (investmentType !== filterProductType) {
+					return false;
+				}
 			}
 
 			// Filter by search query
@@ -488,22 +520,40 @@
 
 				if (periodViewMode === 'weekly') {
 					const startOfYear = new Date(date.getFullYear(), 0, 1);
-					const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+					const dayOfYear = Math.floor(
+						(date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)
+					);
 					const weekNum = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
 					period = `${date.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
 					periodLabel = `สัปดาห์ที่ ${weekNum}, ${date.getFullYear()}`;
 				} else {
 					period = inv.start_date.substring(0, 7); // YYYY-MM
 					const monthNames = [
-						'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-						'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+						'ม.ค.',
+						'ก.พ.',
+						'มี.ค.',
+						'เม.ย.',
+						'พ.ค.',
+						'มิ.ย.',
+						'ก.ค.',
+						'ส.ค.',
+						'ก.ย.',
+						'ต.ค.',
+						'พ.ย.',
+						'ธ.ค.'
 					];
 					periodLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
 				}
 
 				if (!summaries.has(period)) {
 					summaries.set(period, {
-						period, periodLabel, invested: 0, received: 0, profit: 0, roi: 0, count: 0
+						period,
+						periodLabel,
+						invested: 0,
+						received: 0,
+						profit: 0,
+						roi: 0,
+						count: 0
 					});
 				}
 
@@ -521,7 +571,9 @@
 
 				if (periodViewMode === 'weekly') {
 					const startOfYear = new Date(date.getFullYear(), 0, 1);
-					const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+					const dayOfYear = Math.floor(
+						(date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)
+					);
 					const weekNum = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
 					period = `${date.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
 					periodLabel = `สัปดาห์ที่ ${weekNum}, ${date.getFullYear()}`;
@@ -529,15 +581,31 @@
 					const month = (date.getMonth() + 1).toString().padStart(2, '0');
 					period = `${date.getFullYear()}-${month}`;
 					const monthNames = [
-						'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-						'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+						'ม.ค.',
+						'ก.พ.',
+						'มี.ค.',
+						'เม.ย.',
+						'พ.ค.',
+						'มิ.ย.',
+						'ก.ค.',
+						'ส.ค.',
+						'ก.ย.',
+						'ต.ค.',
+						'พ.ย.',
+						'ธ.ค.'
 					];
 					periodLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
 				}
 
 				if (!summaries.has(period)) {
 					summaries.set(period, {
-						period, periodLabel, invested: 0, received: 0, profit: 0, roi: 0, count: 0
+						period,
+						periodLabel,
+						invested: 0,
+						received: 0,
+						profit: 0,
+						roi: 0,
+						count: 0
 					});
 				}
 
@@ -550,14 +618,14 @@
 					summary.received -= parseFloat(log.amount);
 				}
 				summary.count += 1;
-
 			});
 		}
 
 		// Calculate profit and ROI
 		summaries.forEach((summary) => {
 			summary.profit = summary.received - summary.invested;
-			summary.roi = summary.invested > 0 ? ((summary.received - summary.invested) / summary.invested) * 100 : 0;
+			summary.roi =
+				summary.invested > 0 ? ((summary.received - summary.invested) / summary.invested) * 100 : 0;
 		});
 
 		// Sort
@@ -596,12 +664,18 @@
 		received: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.received, 0),
 		profit: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.profit, 0),
 		count: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.count, 0),
-		roi: periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0) > 0 
-			? ((periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.received, 0) - periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0)) / periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0)) * 100 
-			: 0
+		roi:
+			periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0) > 0
+				? ((periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.received, 0) -
+						periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0)) /
+						periodSummaries.reduce((sum: number, s: PeriodSummary) => sum + s.invested, 0)) *
+					100
+				: 0
 	};
 
-	function togglePeriodSort(field: 'period' | 'invested' | 'received' | 'profit' | 'roi' | 'count') {
+	function togglePeriodSort(
+		field: 'period' | 'invested' | 'received' | 'profit' | 'roi' | 'count'
+	) {
 		if (periodSortField === field) {
 			periodSortDirection = periodSortDirection === 'asc' ? 'desc' : 'asc';
 		} else {
@@ -621,7 +695,7 @@
 
 	function getMonthlyData(invs: any[], logs: any[], type: string) {
 		const monthlyStats: Record<string, { invested: number; received: number; count: number }> = {};
-		
+
 		if (type === 'investments') {
 			(invs || []).forEach((inv) => {
 				if (!inv || !inv.start_date) return;
@@ -643,7 +717,7 @@
 				if (!monthlyStats[month]) {
 					monthlyStats[month] = { invested: 0, received: 0, count: 0 };
 				}
-				
+
 				const amount = parseFloat(log.amount || 0) || 0;
 				if (log.type === 'initial_investment') {
 					monthlyStats[month].invested += Math.abs(amount);
@@ -656,12 +730,17 @@
 			});
 		}
 
-		return Object.entries(monthlyStats).sort((a, b) => a[0].localeCompare(b[0])).slice(-6); // 6 เดือนล่าสุด
+		return Object.entries(monthlyStats)
+			.sort((a, b) => a[0].localeCompare(b[0]))
+			.slice(-6); // 6 เดือนล่าสุด
 	}
 
 	function getROIComparisonData(invs: any[]) {
 		return (invs || [])
-			.filter((inv) => inv && (parseFloat(inv.current_received || 0) > 0 || parseFloat(inv.amount || 0) > 0))
+			.filter(
+				(inv) =>
+					inv && (parseFloat(inv.current_received || 0) > 0 || parseFloat(inv.amount || 0) > 0)
+			)
 			.map((inv) => {
 				const invested = parseFloat(inv.amount || 0) || 0;
 				const received = parseFloat(inv.current_received || 0) || 0;
@@ -689,8 +768,9 @@
 	}
 
 	function getProductTypeData(invs: any[], logs: any[], type: string) {
-		const typeStats: Record<string, { count: number; totalAmount: number; totalReceived: number }> = {};
-		
+		const typeStats: Record<string, { count: number; totalAmount: number; totalReceived: number }> =
+			{};
+
 		if (type === 'investments') {
 			(invs || []).forEach((inv) => {
 				const productType = inv.product_type || 'อื่นๆ';
@@ -708,7 +788,7 @@
 				if (!typeStats[productType]) {
 					typeStats[productType] = { count: 0, totalAmount: 0, totalReceived: 0 };
 				}
-				
+
 				const amount = parseFloat(log.amount || 0);
 				if (log.type === 'initial_investment') {
 					typeStats[productType].totalAmount += Math.abs(amount);
@@ -727,13 +807,13 @@
 				count: data.count,
 				amount: data.totalAmount,
 				received: data.totalReceived,
-				roi: data.totalAmount > 0
-					? ((data.totalReceived - data.totalAmount) / data.totalAmount) * 100
-					: 0
+				roi:
+					data.totalAmount > 0
+						? ((data.totalReceived - data.totalAmount) / data.totalAmount) * 100
+						: 0
 			}))
 			.sort((a, b) => b.amount - a.amount);
 	}
-
 
 	// Transaction History Functions
 	async function loadTransactionLogs(investmentId: number | null = null) {
@@ -925,7 +1005,9 @@
 				<!-- Primary Overlay: Deep blue tint for brand consistency -->
 				<div class="absolute inset-0 bg-indigo-900/40"></div>
 				<!-- Secondary Overlay: Gradient for better text readability -->
-				<div class="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/40 to-transparent"></div>
+				<div
+					class="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/40 to-transparent"
+				></div>
 				<!-- Light Blur for a premium feel -->
 				<div class="absolute inset-0 backdrop-blur-[1px]"></div>
 			</div>
@@ -933,14 +1015,18 @@
 			<div class="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4">
 				<div class="flex-1">
 					<div class="mb-2 flex items-center gap-3">
-						<div class="h-10 w-1 bg-white rounded-full"></div>
-						<h1 class="text-4xl font-black tracking-tight text-white drop-shadow-md">Twenty Toys</h1>
+						<div class="h-10 w-1 rounded-full bg-white"></div>
+						<h1 class="text-4xl font-black tracking-tight text-white drop-shadow-md">
+							Twenty Toys
+						</h1>
 					</div>
-					<p class="text-sm font-bold uppercase tracking-[0.2em] text-indigo-100/80 drop-shadow-sm">Investment Portfolio Tracker</p>
+					<p class="text-sm font-bold uppercase tracking-[0.2em] text-indigo-100/80 drop-shadow-sm">
+						Investment Portfolio Tracker
+					</p>
 				</div>
 				<button
 					on:click={handleLogout}
-					class="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 font-black text-xs uppercase tracking-widest text-white backdrop-blur-md transition-all duration-300 hover:bg-white/20 hover:scale-105 active:scale-95 shadow-lg"
+					class="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-white/20 active:scale-95"
 				>
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
@@ -964,13 +1050,14 @@
 							<span class="inline-block h-6 w-1 rounded-full bg-indigo-500"></span>
 							Overview Summary
 						</h2>
-						
+
 						<!-- Toggle Weekly/Monthly -->
 						<div class="flex items-center gap-4">
 							<!-- Summary Type Toggle -->
 							<div class="flex rounded-xl bg-slate-100 p-1">
 								<button
-									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {summaryType === 'investments'
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {summaryType ===
+									'investments'
 										? 'bg-white text-indigo-600 shadow-sm'
 										: 'text-slate-500 hover:text-slate-700'}"
 									on:click={() => (summaryType = 'investments')}
@@ -978,7 +1065,8 @@
 									📂 Investment
 								</button>
 								<button
-									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {summaryType === 'logs'
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {summaryType ===
+									'logs'
 										? 'bg-white text-indigo-600 shadow-sm'
 										: 'text-slate-500 hover:text-slate-700'}"
 									on:click={() => (summaryType = 'logs')}
@@ -991,7 +1079,8 @@
 
 							<div class="flex rounded-xl bg-slate-100 p-1">
 								<button
-									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {periodViewMode === 'weekly'
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {periodViewMode ===
+									'weekly'
 										? 'bg-white text-teal-600 shadow-sm'
 										: 'text-slate-500 hover:text-slate-700'}"
 									on:click={() => (periodViewMode = 'weekly')}
@@ -999,7 +1088,8 @@
 									📅 Weekly
 								</button>
 								<button
-									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {periodViewMode === 'monthly'
+									class="rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all sm:px-4 sm:py-2 sm:text-xs {periodViewMode ===
+									'monthly'
 										? 'bg-white text-teal-600 shadow-sm'
 										: 'text-slate-500 hover:text-slate-700'}"
 									on:click={() => (periodViewMode = 'monthly')}
@@ -1010,26 +1100,62 @@
 						</div>
 					</div>
 
-
 					<!-- Summary Cards -->
 					<div class="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-						<div class="rounded-2xl bg-slate-50 p-3 sm:p-4 ring-1 ring-slate-100">
-							<div class="mb-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-400">ลงทุนรวม</div>
-							<div class="text-base sm:text-xl font-black text-slate-800 tracking-tight">฿{periodTotals.invested.toLocaleString()}</div>
+						<div class="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 sm:p-4">
+							<div
+								class="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:text-xs"
+							>
+								ลงทุนรวม
+							</div>
+							<div class="text-base font-black tracking-tight text-slate-800 sm:text-xl">
+								฿{periodTotals.invested.toLocaleString()}
+							</div>
 						</div>
-						<div class="rounded-2xl bg-emerald-50/30 p-3 sm:p-4 ring-1 ring-emerald-100/50">
-							<div class="mb-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-600/60">รับคืนรวม</div>
-							<div class="text-base sm:text-xl font-black text-emerald-600 tracking-tight">฿{periodTotals.received.toLocaleString()}</div>
+						<div class="rounded-2xl bg-emerald-50/30 p-3 ring-1 ring-emerald-100/50 sm:p-4">
+							<div
+								class="mb-1 text-[10px] font-black uppercase tracking-widest text-emerald-600/60 sm:text-xs"
+							>
+								รับคืนรวม
+							</div>
+							<div class="text-base font-black tracking-tight text-emerald-600 sm:text-xl">
+								฿{periodTotals.received.toLocaleString()}
+							</div>
 						</div>
-						<div class="rounded-2xl {periodTotals.profit >= 0 ? 'bg-emerald-50/30' : 'bg-rose-50/30'} p-3 sm:p-4 ring-1 {periodTotals.profit >= 0 ? 'ring-emerald-100/50' : 'ring-rose-100/50'}">
-							<div class="mb-1 text-[10px] sm:text-xs font-black uppercase tracking-widest {periodTotals.profit >= 0 ? 'text-emerald-600/60' : 'text-rose-600/60'}">กำไร/ขาดทุน</div>
-							<div class="text-base sm:text-xl font-black {periodTotals.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'} tracking-tight">
+						<div
+							class="rounded-2xl {periodTotals.profit >= 0
+								? 'bg-emerald-50/30'
+								: 'bg-rose-50/30'} p-3 ring-1 sm:p-4 {periodTotals.profit >= 0
+								? 'ring-emerald-100/50'
+								: 'ring-rose-100/50'}"
+						>
+							<div
+								class="mb-1 text-[10px] font-black uppercase tracking-widest sm:text-xs {periodTotals.profit >=
+								0
+									? 'text-emerald-600/60'
+									: 'text-rose-600/60'}"
+							>
+								กำไร/ขาดทุน
+							</div>
+							<div
+								class="text-base font-black sm:text-xl {periodTotals.profit >= 0
+									? 'text-emerald-600'
+									: 'text-rose-600'} tracking-tight"
+							>
 								{periodTotals.profit >= 0 ? '+' : ''}฿{periodTotals.profit.toLocaleString()}
 							</div>
 						</div>
-						<div class="rounded-2xl bg-indigo-50/30 p-3 sm:p-4 ring-1 ring-indigo-100/50">
-							<div class="mb-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-indigo-600/60">ROI เฉลี่ย</div>
-							<div class="text-base sm:text-xl font-black {periodTotals.roi >= 0 ? 'text-indigo-600' : 'text-rose-600'} tracking-tight">
+						<div class="rounded-2xl bg-indigo-50/30 p-3 ring-1 ring-indigo-100/50 sm:p-4">
+							<div
+								class="mb-1 text-[10px] font-black uppercase tracking-widest text-indigo-600/60 sm:text-xs"
+							>
+								ROI เฉลี่ย
+							</div>
+							<div
+								class="text-base font-black sm:text-xl {periodTotals.roi >= 0
+									? 'text-indigo-600'
+									: 'text-rose-600'} tracking-tight"
+							>
 								{periodTotals.roi >= 0 ? '+' : ''}{periodTotals.roi.toFixed(2)}%
 							</div>
 						</div>
@@ -1045,7 +1171,11 @@
 								<span>📊</span>
 								<span>สรุปราย{periodViewMode === 'monthly' ? 'เดือน' : 'สัปดาห์'}</span>
 							</div>
-							<span class="text-xs transition-transform duration-300 {showMobilePeriodSummaries ? 'rotate-180' : ''}">
+							<span
+								class="text-xs transition-transform duration-300 {showMobilePeriodSummaries
+									? 'rotate-180'
+									: ''}"
+							>
 								▼
 							</span>
 						</button>
@@ -1054,7 +1184,7 @@
 					<!-- Data Summary View -->
 					{#if periodSummaries.length > 0}
 						<!-- Desktop Table View (Hidden on Mobile) -->
-						<div class="hidden sm:block overflow-x-auto rounded-2xl border border-slate-200">
+						<div class="hidden overflow-x-auto rounded-2xl border border-slate-200 sm:block">
 							<table class="w-full text-sm">
 								<thead>
 									<tr class="border-b border-slate-100 bg-slate-50/50">
@@ -1065,26 +1195,47 @@
 											>
 												ช่วงเวลา
 												{#if periodSortField === 'period'}
-													<span class="text-indigo-600">{periodSortDirection === 'asc' ? '↑' : '↓'}</span>
+													<span class="text-indigo-600"
+														>{periodSortDirection === 'asc' ? '↑' : '↓'}</span
+													>
 												{/if}
 											</button>
 										</th>
-										<th class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400">รายการ</th>
-										<th class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400">ลงทุน</th>
-										<th class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400">คืน</th>
-										<th class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400">กำไร</th>
-										<th class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400">ROI</th>
+										<th
+											class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400"
+											>รายการ</th
+										>
+										<th
+											class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400"
+											>ลงทุน</th
+										>
+										<th
+											class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400"
+											>คืน</th
+										>
+										<th
+											class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400"
+											>กำไร</th
+										>
+										<th
+											class="px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-400"
+											>ROI</th
+										>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-slate-100">
 									{#each periodSummaries as summary (summary.period)}
 										<tr class="transition-colors hover:bg-slate-50/50">
 											<td class="px-4 py-3">
-												<div class="text-sm font-black text-slate-800 leading-tight">{summary.periodLabel}</div>
+												<div class="text-sm font-black leading-tight text-slate-800">
+													{summary.periodLabel}
+												</div>
 												<div class="text-[0.625rem] font-bold text-slate-400">{summary.period}</div>
 											</td>
 											<td class="px-4 py-3 text-right">
-												<span class="rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-500">
+												<span
+													class="rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-500"
+												>
 													{summary.count}
 												</span>
 											</td>
@@ -1094,7 +1245,11 @@
 											<td class="px-4 py-3 text-right text-sm font-bold text-emerald-600">
 												฿{summary.received.toLocaleString()}
 											</td>
-											<td class="px-4 py-3 text-right text-sm font-black {summary.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+											<td
+												class="px-4 py-3 text-right text-sm font-black {summary.profit >= 0
+													? 'text-emerald-600'
+													: 'text-rose-600'}"
+											>
 												{summary.profit >= 0 ? '+' : ''}฿{summary.profit.toLocaleString()}
 											</td>
 											<td class="px-4 py-3 text-right">
@@ -1111,15 +1266,31 @@
 								</tbody>
 								<tfoot>
 									<tr class="border-t-2 border-slate-200 bg-slate-50/50 font-black">
-										<td class="px-4 py-4 text-sm text-slate-900 uppercase tracking-widest">รวมทั้งหมด</td>
-										<td class="px-4 py-4 text-right text-xs text-slate-400">{periodTotals.count} รายการ</td>
-										<td class="px-4 py-4 text-right text-sm text-slate-900">฿{periodTotals.invested.toLocaleString()}</td>
-										<td class="px-4 py-4 text-right text-sm text-emerald-600">฿{periodTotals.received.toLocaleString()}</td>
-										<td class="px-4 py-4 text-right text-sm {periodTotals.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+										<td class="px-4 py-4 text-sm uppercase tracking-widest text-slate-900"
+											>รวมทั้งหมด</td
+										>
+										<td class="px-4 py-4 text-right text-xs text-slate-400"
+											>{periodTotals.count} รายการ</td
+										>
+										<td class="px-4 py-4 text-right text-sm text-slate-900"
+											>฿{periodTotals.invested.toLocaleString()}</td
+										>
+										<td class="px-4 py-4 text-right text-sm text-emerald-600"
+											>฿{periodTotals.received.toLocaleString()}</td
+										>
+										<td
+											class="px-4 py-4 text-right text-sm {periodTotals.profit >= 0
+												? 'text-emerald-600'
+												: 'text-rose-600'}"
+										>
 											฿{periodTotals.profit.toLocaleString()}
 										</td>
 										<td class="px-4 py-4 text-right">
-											<span class="text-xs font-black {periodTotals.roi >= 0 ? 'text-indigo-600' : 'text-rose-600'}">
+											<span
+												class="text-xs font-black {periodTotals.roi >= 0
+													? 'text-indigo-600'
+													: 'text-rose-600'}"
+											>
 												{periodTotals.roi.toFixed(1)}%
 											</span>
 										</td>
@@ -1132,35 +1303,68 @@
 						{#if showMobilePeriodSummaries}
 							<div class="space-y-3 sm:hidden">
 								{#each periodSummaries as summary (summary.period)}
-									<div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100/50 transition-all active:scale-[0.98]">
-										<div class="mb-3 flex items-center justify-between border-b border-slate-50 pb-2">
+									<div
+										class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100/50 transition-all active:scale-[0.98]"
+									>
+										<div
+											class="mb-3 flex items-center justify-between border-b border-slate-50 pb-2"
+										>
 											<div>
-												<div class="text-xs font-black text-slate-800 tracking-tight">{summary.periodLabel}</div>
-												<div class="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider">{summary.period}</div>
+												<div class="text-xs font-black tracking-tight text-slate-800">
+													{summary.periodLabel}
+												</div>
+												<div
+													class="text-[0.625rem] font-bold uppercase tracking-wider text-slate-400"
+												>
+													{summary.period}
+												</div>
 											</div>
-											<span class="rounded-lg bg-slate-50 px-2 py-1 text-[0.625rem] font-black text-slate-400 ring-1 ring-slate-100">
+											<span
+												class="rounded-lg bg-slate-50 px-2 py-1 text-[0.625rem] font-black text-slate-400 ring-1 ring-slate-100"
+											>
 												{summary.count} รายการ
 											</span>
 										</div>
-										
+
 										<div class="grid grid-cols-2 gap-x-4">
 											<div class="space-y-2 border-r border-slate-50 pr-4">
 												<div>
-													<div class="text-[0.625rem] font-black uppercase tracking-widest text-slate-300">กระแสเงิน</div>
-													<div class="flex flex-col gap-0.5 mt-1">
-														<div class="text-[0.7rem] font-bold text-slate-600">ลง: ฿{summary.invested.toLocaleString()}</div>
-														<div class="text-[0.7rem] font-bold text-emerald-600">คืน: ฿{summary.received.toLocaleString()}</div>
+													<div
+														class="text-[0.625rem] font-black uppercase tracking-widest text-slate-300"
+													>
+														กระแสเงิน
+													</div>
+													<div class="mt-1 flex flex-col gap-0.5">
+														<div class="text-[0.7rem] font-bold text-slate-600">
+															ลง: ฿{summary.invested.toLocaleString()}
+														</div>
+														<div class="text-[0.7rem] font-bold text-emerald-600">
+															คืน: ฿{summary.received.toLocaleString()}
+														</div>
 													</div>
 												</div>
 											</div>
 											<div class="pl-0">
 												<div>
-													<div class="text-[0.625rem] font-black uppercase tracking-widest text-slate-300">ผลประกอบการ</div>
+													<div
+														class="text-[0.625rem] font-black uppercase tracking-widest text-slate-300"
+													>
+														ผลประกอบการ
+													</div>
 													<div class="mt-1 flex flex-col items-start gap-1">
-														<div class="text-[0.75rem] font-black {summary.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+														<div
+															class="text-[0.75rem] font-black {summary.profit >= 0
+																? 'text-emerald-600'
+																: 'text-rose-600'}"
+														>
 															{summary.profit >= 0 ? '+' : ''}฿{summary.profit.toLocaleString()}
 														</div>
-														<div class="rounded-md px-1.5 py-0.5 text-[0.625rem] font-black {summary.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">
+														<div
+															class="rounded-md px-1.5 py-0.5 text-[0.625rem] font-black {summary.roi >=
+															0
+																? 'bg-emerald-50 text-emerald-600'
+																: 'bg-rose-50 text-rose-600'}"
+														>
 															{summary.roi >= 0 ? '+' : ''}{summary.roi.toFixed(1)}%
 														</div>
 													</div>
@@ -1205,24 +1409,44 @@
 								}}
 							>
 								{#if showAddForm || showTypeSelector}
-									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+										><path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="3"
+											d="M6 18L18 6M6 6l12 12"
+										/></svg
+									>
 									ปิดหน้าฟอร์ม
 								{:else}
-									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" /></svg>
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+										><path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="3"
+											d="M12 4v16m8-8H4"
+										/></svg
+									>
 									เพิ่มการลงทุนใหม่
 								{/if}
 							</button>
 
-							<div class="flex items-center gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
+							<div
+								class="flex items-center gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200"
+							>
 								<button
-									class="flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-black transition-all {showCharts ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}"
+									class="flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-black transition-all {showCharts
+										? 'bg-indigo-50 text-indigo-600'
+										: 'text-slate-500 hover:bg-slate-50'}"
 									on:click={() => (showCharts = !showCharts)}
 								>
 									📊 สถิติ
 								</button>
-								<div class="h-4 w-px bg-slate-200 mx-1"></div>
+								<div class="mx-1 h-4 w-px bg-slate-200"></div>
 								<button
-									class="flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-black transition-all {showTransactionHistory ? 'bg-purple-50 text-purple-600' : 'text-slate-500 hover:bg-slate-50'}"
+									class="flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-black transition-all {showTransactionHistory
+										? 'bg-purple-50 text-purple-600'
+										: 'text-slate-500 hover:bg-slate-50'}"
 									on:click={() => openTransactionHistory(null)}
 								>
 									📜 ประวัติ log
@@ -1232,29 +1456,42 @@
 					</div>
 
 					<!-- Filter Panel: Structured & Aligned -->
-					<div class="rounded-3xl bg-slate-50/50 p-6 ring-1 ring-slate-100 transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+					<div
+						class="rounded-3xl bg-slate-50/50 p-6 ring-1 ring-slate-100 transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50"
+					>
 						<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
 							<!-- Group 1: Status -->
 							<div class="space-y-3">
 								<div class="flex items-center gap-2">
 									<div class="h-1.5 w-1.5 rounded-full bg-slate-300"></div>
-									<span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Filter by Status</span>
+									<span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400"
+										>Filter by Status</span
+									>
 								</div>
 								<div class="flex flex-wrap gap-2">
 									<button
-										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterStatus === 'all' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
+										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterStatus ===
+										'all'
+											? 'bg-slate-900 text-white shadow-lg shadow-slate-200'
+											: 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
 										on:click={() => (filterStatus = 'all')}
 									>
 										ทั้งหมด
 									</button>
 									<button
-										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterStatus === 'active' ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
+										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterStatus ===
+										'active'
+											? 'bg-orange-500 text-white shadow-lg shadow-orange-100'
+											: 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
 										on:click={() => (filterStatus = 'active')}
 									>
 										กำลังลงทุน (Active)
 									</button>
 									<button
-										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterStatus === 'completed' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
+										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterStatus ===
+										'completed'
+											? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100'
+											: 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
 										on:click={() => (filterStatus = 'completed')}
 									>
 										จบแล้ว (Completed)
@@ -1266,21 +1503,41 @@
 							<div class="space-y-3">
 								<div class="flex items-center gap-2">
 									<div class="h-1.5 w-1.5 rounded-full bg-slate-300"></div>
-									<span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Filter by Category</span>
+									<span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400"
+										>Filter by Category</span
+									>
 								</div>
 								<div class="flex flex-wrap gap-2">
 									<button
-										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterProductType === 'all' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
+										class="rounded-xl px-5 py-2.5 text-xs font-black transition-all {filterProductType ===
+										'all'
+											? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+											: 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
 										on:click={() => (filterProductType = 'all')}
 									>
 										ทุกประเภท
 									</button>
 									{#each investmentTypes as type}
 										<button
-											class="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition-all {filterProductType === type.label ? 'bg-white text-slate-800 shadow-md ring-2 ring-indigo-500/20' : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
+											class="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition-all {filterProductType ===
+											type.label
+												? 'bg-white text-slate-800 shadow-md ring-2 ring-indigo-500/20'
+												: 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'}"
 											on:click={() => (filterProductType = type.label)}
 										>
-											<span>{type.label === 'ค่าส่ง' ? '📦' : type.label === 'ค่าลิซ่า' ? '💌' : type.label === 'ค่าคอลแลป' ? '🤝' : '📋'}</span>
+											<span>
+												{#if type.label === 'ค่าลงทุน'}
+													💰
+												{:else if type.label === 'ค่าส่ง'}
+													📦
+												{:else if type.label === 'ค่าลิซ่า'}
+													💌
+												{:else if type.label === 'ค่าคอลแลป'}
+													🤝
+												{:else}
+													📋
+												{/if}
+											</span>
 											{type.label}
 										</button>
 									{/each}
@@ -1295,7 +1552,14 @@
 					<div class="flex flex-col gap-4 md:flex-row md:items-center">
 						<div class="flex-shrink-0">
 							<span class="flex items-center gap-2 text-sm font-bold text-indigo-900">
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2.5"
+										d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+									/></svg
+								>
 								Quick Search
 							</span>
 						</div>
@@ -1312,28 +1576,42 @@
 						</div>
 
 						<!-- Sort Options -->
-						<div class="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+						<div
+							class="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200"
+						>
 							<div class="flex items-center gap-1 overflow-x-auto whitespace-nowrap p-1">
 								<button
-									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'latest' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder ===
+									'latest'
+										? 'bg-indigo-600 text-white'
+										: 'text-slate-500 hover:bg-slate-50'}"
 									on:click={() => (sortOrder = 'latest')}
 								>
 									Latest
 								</button>
 								<button
-									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'oldest' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder ===
+									'oldest'
+										? 'bg-indigo-600 text-white'
+										: 'text-slate-500 hover:bg-slate-50'}"
 									on:click={() => (sortOrder = 'oldest')}
 								>
 									Oldest
 								</button>
 								<button
-									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'amount_high' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder ===
+									'amount_high'
+										? 'bg-indigo-600 text-white'
+										: 'text-slate-500 hover:bg-slate-50'}"
 									on:click={() => (sortOrder = 'amount_high')}
 								>
 									฿ High
 								</button>
 								<button
-									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder === 'amount_low' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}"
+									class="rounded-xl px-3 py-2 text-xs font-bold transition-all {sortOrder ===
+									'amount_low'
+										? 'bg-indigo-600 text-white'
+										: 'text-slate-500 hover:bg-slate-50'}"
 									on:click={() => (sortOrder = 'amount_low')}
 								>
 									฿ Low
@@ -1342,7 +1620,6 @@
 						</div>
 					</div>
 				</section>
-
 
 				<!-- Charts Section -->
 
@@ -1508,19 +1785,49 @@
 
 				<!-- Investment Type Selector Popup -->
 				{#if showTypeSelector}
-					<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" on:click|self={closeTypeSelector}>
-						<div class="mx-4 w-full max-w-lg scale-100 transform rounded-3xl bg-white p-8 shadow-2xl transition-all">
+					<div
+						class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+						on:click|self={closeTypeSelector}
+					>
+						<div
+							class="mx-4 w-full max-w-lg scale-100 transform rounded-3xl bg-white p-8 shadow-2xl transition-all"
+						>
 							<div class="mb-8 text-center">
-								<div class="mb-3 inline-flex items-center justify-center rounded-2xl bg-indigo-100 p-4">
-									<svg class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+								<div
+									class="mb-3 inline-flex items-center justify-center rounded-2xl bg-indigo-100 p-4"
+								>
+									<svg
+										class="h-8 w-8 text-indigo-600"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+										/>
 									</svg>
 								</div>
 								<h3 class="text-2xl font-bold text-slate-800">เลือกประเภทการลงทุน</h3>
 								<p class="mt-1 text-sm text-slate-500">กรุณาเลือกประเภทของรายการนี้</p>
 							</div>
-							
+
 							<div class="grid grid-cols-2 gap-4">
+								<!-- ค่าลงทุน (New) -->
+								<button
+									class="group relative overflow-hidden rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-100"
+									on:click={() => selectInvestmentType('investment')}
+								>
+									<div class="mb-3 text-4xl">💰</div>
+									<div class="text-lg font-bold text-emerald-700">ค่าลงทุน</div>
+									<div class="text-xs text-emerald-600/70">Capital, ลงทุนหลัก</div>
+									<div
+										class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-emerald-200/30 transition-transform group-hover:scale-150"
+									></div>
+								</button>
+
 								<!-- ค่าส่ง -->
 								<button
 									class="group relative overflow-hidden rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-100"
@@ -1529,9 +1836,11 @@
 									<div class="mb-3 text-4xl">📦</div>
 									<div class="text-lg font-bold text-amber-700">ค่าส่ง</div>
 									<div class="text-xs text-amber-600/70">ค่าขนส่ง, ค่าพัสดุ</div>
-									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-amber-200/30 transition-transform group-hover:scale-150"></div>
+									<div
+										class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-amber-200/30 transition-transform group-hover:scale-150"
+									></div>
 								</button>
-								
+
 								<!-- ค่าลิซ่า -->
 								<button
 									class="group relative overflow-hidden rounded-2xl border-2 border-pink-200 bg-pink-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-pink-400 hover:shadow-lg hover:shadow-pink-100"
@@ -1540,9 +1849,11 @@
 									<div class="mb-3 text-4xl">💌</div>
 									<div class="text-lg font-bold text-pink-700">ค่าลิซ่า</div>
 									<div class="text-xs text-pink-600/70">Lisa, LINE Delivery</div>
-									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-pink-200/30 transition-transform group-hover:scale-150"></div>
+									<div
+										class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-pink-200/30 transition-transform group-hover:scale-150"
+									></div>
 								</button>
-								
+
 								<!-- ค่าคอลแลป -->
 								<button
 									class="group relative overflow-hidden rounded-2xl border-2 border-violet-200 bg-violet-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-violet-400 hover:shadow-lg hover:shadow-violet-100"
@@ -1551,9 +1862,11 @@
 									<div class="mb-3 text-4xl">🤝</div>
 									<div class="text-lg font-bold text-violet-700">ค่าคอลแลป</div>
 									<div class="text-xs text-violet-600/70">Collaboration, ร่วมมือ</div>
-									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-violet-200/30 transition-transform group-hover:scale-150"></div>
+									<div
+										class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-violet-200/30 transition-transform group-hover:scale-150"
+									></div>
 								</button>
-								
+
 								<!-- ค่าอื่นๆ -->
 								<button
 									class="group relative overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-50 p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-slate-400 hover:shadow-lg hover:shadow-slate-100"
@@ -1562,10 +1875,12 @@
 									<div class="mb-3 text-4xl">📋</div>
 									<div class="text-lg font-bold text-slate-700">ค่าอื่นๆ</div>
 									<div class="text-xs text-slate-600/70">รายการทั่วไป</div>
-									<div class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-slate-200/30 transition-transform group-hover:scale-150"></div>
+									<div
+										class="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-slate-200/30 transition-transform group-hover:scale-150"
+									></div>
 								</button>
 							</div>
-							
+
 							<button
 								class="mt-6 w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200"
 								on:click={closeTypeSelector}
@@ -1578,25 +1893,41 @@
 
 				<!-- Add Investment Form -->
 				{#if showAddForm}
-					<section class="relative overflow-hidden rounded-[2.5rem] bg-white ring-1 ring-slate-200 shadow-2xl transition-all duration-500">
+					<section
+						class="relative overflow-hidden rounded-[2.5rem] bg-white shadow-2xl ring-1 ring-slate-200 transition-all duration-500"
+					>
 						<!-- Decorative Background -->
-						<div class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-50/50 blur-3xl"></div>
-						<div class="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-pink-50/50 blur-3xl"></div>
+						<div
+							class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-50/50 blur-3xl"
+						></div>
+						<div
+							class="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-pink-50/50 blur-3xl"
+						></div>
 
 						<div class="relative p-8 sm:p-12">
 							<div class="mb-10 text-center">
-								<div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-3xl shadow-inner">
+								<div
+									class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-3xl shadow-inner"
+								>
 									➕
 								</div>
-								<h3 class="text-3xl font-black text-slate-800 tracking-tight">เพิ่มการลงทุนใหม่</h3>
+								<h3 class="text-3xl font-black tracking-tight text-slate-800">เพิ่มการลงทุนใหม่</h3>
 								{#if formData.product_type}
-									<div class="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-black uppercase tracking-widest shadow-sm
+									<div
+										class="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-black uppercase tracking-widest shadow-sm
+										{formData.product_type === 'ค่าลงทุน'
+											? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+											: ''}
 										{formData.product_type === 'ค่าส่ง' ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200' : ''}
 										{formData.product_type === 'ค่าลิซ่า' ? 'bg-pink-100 text-pink-700 ring-1 ring-pink-200' : ''}
-										{formData.product_type === 'ค่าคอลแลป' ? 'bg-violet-100 text-violet-700 ring-1 ring-violet-200' : ''}
+										{formData.product_type === 'ค่าคอลแลป'
+											? 'bg-violet-100 text-violet-700 ring-1 ring-violet-200'
+											: ''}
 										{formData.product_type === 'ค่าอื่นๆ' ? 'bg-slate-100 text-slate-700 ring-1 ring-slate-200' : ''}
-									">
+									"
+									>
 										<span>
+											{formData.product_type === 'ค่าลงทุน' ? '💰' : ''}
 											{formData.product_type === 'ค่าส่ง' ? '📦' : ''}
 											{formData.product_type === 'ค่าลิซ่า' ? '💌' : ''}
 											{formData.product_type === 'ค่าคอลแลป' ? '🤝' : ''}
@@ -1609,68 +1940,96 @@
 
 							<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 								<div class="space-y-2">
-									<label for="amount" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">จำนวนเงินลงทุน (บาท) *</label>
+									<label
+										for="amount"
+										class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+										>จำนวนเงินลงทุน (บาท) *</label
+									>
 									<div class="relative">
-										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">💰</span>
+										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+											>💰</span
+										>
 										<input
 											type="number"
 											id="amount"
 											bind:value={formData.amount}
 											placeholder="0.00"
-											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 										/>
 									</div>
 								</div>
 
 								<div class="space-y-2">
-									<label for="start_date" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">วันที่เริ่มต้น *</label>
+									<label
+										for="start_date"
+										class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+										>วันที่เริ่มต้น *</label
+									>
 									<div class="relative">
-										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">📅</span>
+										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+											>📅</span
+										>
 										<input
 											type="date"
 											id="start_date"
 											bind:value={formData.start_date}
-											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 										/>
 									</div>
 								</div>
 
 								<div class="space-y-2">
-									<label for="end_date" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">วันที่คาดว่าจะจบ</label>
+									<label
+										for="end_date"
+										class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+										>วันที่คาดว่าจะจบ</label
+									>
 									<div class="relative">
-										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">🏁</span>
+										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+											>🏁</span
+										>
 										<input
 											type="date"
 											id="end_date"
 											bind:value={formData.end_date}
-											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 										/>
 									</div>
 								</div>
 
 								<div class="space-y-2">
-									<label for="expected_return" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">เป้าหมาย (บาท)</label>
+									<label
+										for="expected_return"
+										class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+										>เป้าหมาย (บาท)</label
+									>
 									<div class="relative">
-										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">🎯</span>
+										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+											>🎯</span
+										>
 										<input
 											type="number"
 											id="expected_return"
 											bind:value={formData.expected_return}
 											placeholder="0.00"
-											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 										/>
 									</div>
 								</div>
 
 								<div class="space-y-2 md:col-span-2">
-									<label for="notes" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">หมายเหตุ / รายละเอียด</label>
+									<label
+										for="notes"
+										class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+										>หมายเหตุ / รายละเอียด</label
+									>
 									<div class="relative">
 										<span class="absolute left-4 top-4 text-xl opacity-40">📝</span>
 										<textarea
 											id="notes"
 											bind:value={formData.notes}
 											placeholder="รายละเอียดเพิ่มเติมเกี่ยวกับการลงทุนนี้..."
-											class="min-h-[120px] w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-medium text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+											class="min-h-[120px] w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-medium text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 										></textarea>
 									</div>
 								</div>
@@ -1713,65 +2072,99 @@
 							on:click|stopPropagation={() => {}}
 						>
 							<!-- Header -->
-							<div class="p-8 text-center bg-emerald-50/50">
-								<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm ring-1 ring-emerald-100">
+							<div class="bg-emerald-50/50 p-8 text-center">
+								<div
+									class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm ring-1 ring-emerald-100"
+								>
 									💵
 								</div>
-								<h3 class="text-2xl font-black text-slate-800 tracking-tight">เพิ่มยอดเงินที่ได้รับ</h3>
-								<p class="text-sm font-bold text-emerald-600 mt-1">{modalInvestment.product_type} #{modalInvestment.id}</p>
+								<h3 class="text-2xl font-black tracking-tight text-slate-800">
+									เพิ่มยอดเงินที่ได้รับ
+								</h3>
+								<p class="mt-1 text-sm font-bold text-emerald-600">
+									{modalInvestment.product_type} #{modalInvestment.id}
+								</p>
 							</div>
 
-							<div class="p-8 space-y-6">
+							<div class="space-y-6 p-8">
 								<div class="grid grid-cols-2 gap-4">
 									<div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-										<div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">ลงทุน</div>
-										<div class="text-sm font-black text-slate-800">฿{parseFloat(modalInvestment.amount).toLocaleString()}</div>
+										<div
+											class="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400"
+										>
+											ลงทุน
+										</div>
+										<div class="text-sm font-black text-slate-800">
+											฿{parseFloat(modalInvestment.amount).toLocaleString()}
+										</div>
 									</div>
 									<div class="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-										<div class="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">ได้รับแล้ว</div>
-										<div class="text-sm font-black text-emerald-600">฿{(modalInvestment.current_received || 0).toLocaleString()}</div>
+										<div
+											class="mb-1 text-[10px] font-black uppercase tracking-widest text-emerald-600"
+										>
+											ได้รับแล้ว
+										</div>
+										<div class="text-sm font-black text-emerald-600">
+											฿{(modalInvestment.current_received || 0).toLocaleString()}
+										</div>
 									</div>
 								</div>
 
 								<div class="space-y-2">
-									<label for="received-amount" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">เงินที่ได้รับเพิ่ม (บาท)</label>
+									<label
+										for="received-amount"
+										class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+										>เงินที่ได้รับเพิ่ม (บาท)</label
+									>
 									<div class="relative">
-										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">➕</span>
+										<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+											>➕</span
+										>
 										<input
 											type="number"
 											id="received-amount"
 											bind:value={receivedAmount}
 											placeholder="0.00"
 											autofocus
-											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+											class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
 										/>
 									</div>
 								</div>
 
 								{#if receivedAmount && !isNaN(parseFloat(receivedAmount))}
 									<div class="mt-4 rounded-2xl bg-slate-900 p-5 shadow-xl shadow-slate-200">
-										<div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">
+										<div
+											class="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400"
+										>
 											<span>Total Sum</span>
 											<span class="text-emerald-400">Preview</span>
 										</div>
 										<div class="flex items-baseline justify-between">
-											<span class="text-2xl font-black text-white">฿{( (modalInvestment.current_received || 0) + parseFloat(receivedAmount) ).toLocaleString()}</span>
-											<span class="text-xs font-bold text-emerald-400">+{parseFloat(receivedAmount).toLocaleString()}</span>
+											<span class="text-2xl font-black text-white"
+												>฿{(
+													(modalInvestment.current_received || 0) + parseFloat(receivedAmount)
+												).toLocaleString()}</span
+											>
+											<span class="text-xs font-bold text-emerald-400"
+												>+{parseFloat(receivedAmount).toLocaleString()}</span
+											>
 										</div>
 									</div>
 								{/if}
 							</div>
 
-							<div class="p-8 pt-0 flex flex-col gap-3">
+							<div class="flex flex-col gap-3 p-8 pt-0">
 								<button
 									class="w-full rounded-[1.5rem] bg-emerald-500 py-5 text-lg font-black text-white shadow-xl shadow-emerald-100 transition-all hover:bg-emerald-600 active:scale-95 disabled:opacity-50 disabled:grayscale"
 									on:click={updateReceivedAmount}
-									disabled={!receivedAmount || isNaN(parseFloat(receivedAmount)) || parseFloat(receivedAmount) <= 0}
+									disabled={!receivedAmount ||
+										isNaN(parseFloat(receivedAmount)) ||
+										parseFloat(receivedAmount) <= 0}
 								>
 									บันทึกข้อมูล
 								</button>
 								<button
-									class="w-full rounded-[1.5rem] bg-slate-100 py-4 text-sm font-black text-slate-500 hover:bg-slate-200 transition-all"
+									class="w-full rounded-[1.5rem] bg-slate-100 py-4 text-sm font-black text-slate-500 transition-all hover:bg-slate-200"
 									on:click={closeReceivedModal}
 								>
 									ยกเลิก
@@ -1797,10 +2190,14 @@
 							<div class="sticky top-0 z-10 bg-white/80 p-8 pb-4 backdrop-blur-md">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-4">
-										<div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl shadow-inner">
+										<div
+											class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl shadow-inner"
+										>
 											✏️
 										</div>
-										<h3 class="text-2xl font-black text-slate-800 tracking-tight">แก้ไขข้อมูลการลงทุน</h3>
+										<h3 class="text-2xl font-black tracking-tight text-slate-800">
+											แก้ไขข้อมูลการลงทุน
+										</h3>
 									</div>
 									<button
 										class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
@@ -1809,108 +2206,181 @@
 								</div>
 							</div>
 
-							<div class="p-8 pt-4 space-y-8">
+							<div class="space-y-8 p-8 pt-4">
 								<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
 									<div class="space-y-2">
-										<label for="edit-amount" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">จำนวนเงินลงทุน (บาท) *</label>
+										<label
+											for="edit-amount"
+											class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+											>จำนวนเงินลงทุน (บาท) *</label
+										>
 										<div class="relative">
-											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">💰</span>
+											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+												>💰</span
+											>
 											<input
 												id="edit-amount"
 												type="number"
 												bind:value={formData.amount}
 												required
-												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 											/>
 										</div>
 									</div>
 
 									<div class="space-y-2">
-										<label for="edit-start-date" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">วันที่เริ่มลงทุน *</label>
+										<label
+											for="edit-start-date"
+											class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+											>วันที่เริ่มลงทุน *</label
+										>
 										<div class="relative">
-											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">📅</span>
+											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+												>📅</span
+											>
 											<input
 												id="edit-start-date"
 												type="date"
 												bind:value={formData.start_date}
 												required
-												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 											/>
 										</div>
 									</div>
 
 									<div class="space-y-2">
-										<label for="edit-end-date" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">วันที่คาดว่าจบ</label>
+										<label
+											for="edit-end-date"
+											class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+											>วันที่คาดว่าจบ</label
+										>
 										<div class="relative">
-											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">🏁</span>
+											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+												>🏁</span
+											>
 											<input
 												id="edit-end-date"
 												type="date"
 												bind:value={formData.end_date}
-												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 											/>
 										</div>
 									</div>
 
 									<div class="space-y-2">
-										<label for="edit-expected-return" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">เป้าหมาย (บาท)</label>
+										<label
+											for="edit-expected-return"
+											class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+											>เป้าหมาย (บาท)</label
+										>
 										<div class="relative">
-											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">🎯</span>
+											<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40"
+												>🎯</span
+											>
 											<input
 												id="edit-expected-return"
 												type="number"
 												bind:value={formData.expected_return}
-												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+												class="w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-bold text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 											/>
 										</div>
 									</div>
 
 									<div class="space-y-3 md:col-span-2">
-										<label class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">ประเภทการลงทุน</label>
-										<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+										<label class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+											>ประเภทการลงทุน</label
+										>
+										<div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
 											<button
 												type="button"
-												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type === 'ค่าส่ง' ? 'border-amber-400 bg-amber-50 ring-4 ring-amber-100 shadow-lg' : 'border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200'}"
-												on:click={() => formData.product_type = 'ค่าส่ง'}
+												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type ===
+												'ค่าลงทุน'
+													? 'border-emerald-400 bg-emerald-50 shadow-lg ring-4 ring-emerald-100'
+													: 'border-slate-100 bg-slate-50 hover:border-slate-200 hover:bg-white'}"
+												on:click={() => (formData.product_type = 'ค่าลงทุน')}
+											>
+												<span class="text-3xl">💰</span>
+												<span
+													class="text-xs font-black {formData.product_type === 'ค่าลงทุน'
+														? 'text-emerald-700'
+														: 'text-slate-400'}">ค่าลงทุน</span
+												>
+											</button>
+											<button
+												type="button"
+												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type ===
+												'ค่าส่ง'
+													? 'border-amber-400 bg-amber-50 shadow-lg ring-4 ring-amber-100'
+													: 'border-slate-100 bg-slate-50 hover:border-slate-200 hover:bg-white'}"
+												on:click={() => (formData.product_type = 'ค่าส่ง')}
 											>
 												<span class="text-3xl">📦</span>
-												<span class="text-xs font-black {formData.product_type === 'ค่าส่ง' ? 'text-amber-700' : 'text-slate-400'}">ค่าส่ง</span>
+												<span
+													class="text-xs font-black {formData.product_type === 'ค่าส่ง'
+														? 'text-amber-700'
+														: 'text-slate-400'}">ค่าส่ง</span
+												>
 											</button>
 											<button
 												type="button"
-												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type === 'ค่าลิซ่า' ? 'border-pink-400 bg-pink-50 ring-4 ring-pink-100 shadow-lg' : 'border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200'}"
-												on:click={() => formData.product_type = 'ค่าลิซ่า'}
+												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type ===
+												'ค่าลิซ่า'
+													? 'border-pink-400 bg-pink-50 shadow-lg ring-4 ring-pink-100'
+													: 'border-slate-100 bg-slate-50 hover:border-slate-200 hover:bg-white'}"
+												on:click={() => (formData.product_type = 'ค่าลิซ่า')}
 											>
 												<span class="text-3xl">💌</span>
-												<span class="text-xs font-black {formData.product_type === 'ค่าลิซ่า' ? 'text-pink-700' : 'text-slate-400'}">ค่าลิซ่า</span>
+												<span
+													class="text-xs font-black {formData.product_type === 'ค่าลิซ่า'
+														? 'text-pink-700'
+														: 'text-slate-400'}">ค่าลิซ่า</span
+												>
 											</button>
 											<button
 												type="button"
-												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type === 'ค่าคอลแลป' ? 'border-violet-400 bg-violet-50 ring-4 ring-violet-100 shadow-lg' : 'border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200'}"
-												on:click={() => formData.product_type = 'ค่าคอลแลป'}
+												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type ===
+												'ค่าคอลแลป'
+													? 'border-violet-400 bg-violet-50 shadow-lg ring-4 ring-violet-100'
+													: 'border-slate-100 bg-slate-50 hover:border-slate-200 hover:bg-white'}"
+												on:click={() => (formData.product_type = 'ค่าคอลแลป')}
 											>
 												<span class="text-3xl">🤝</span>
-												<span class="text-xs font-black {formData.product_type === 'ค่าคอลแลป' ? 'text-violet-700' : 'text-slate-400'}">ค่าคอลแลป</span>
+												<span
+													class="text-xs font-black {formData.product_type === 'ค่าคอลแลป'
+														? 'text-violet-700'
+														: 'text-slate-400'}">ค่าคอลแลป</span
+												>
 											</button>
 											<button
 												type="button"
-												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type === 'ค่าอื่นๆ' ? 'border-slate-400 bg-slate-100 ring-4 ring-slate-100 shadow-lg' : 'border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200'}"
-												on:click={() => formData.product_type = 'ค่าอื่นๆ'}
+												class="flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-300 {formData.product_type ===
+												'ค่าอื่นๆ'
+													? 'border-slate-400 bg-slate-100 shadow-lg ring-4 ring-slate-100'
+													: 'border-slate-100 bg-slate-50 hover:border-slate-200 hover:bg-white'}"
+												on:click={() => (formData.product_type = 'ค่าอื่นๆ')}
 											>
 												<span class="text-3xl">📋</span>
-												<span class="text-xs font-black {formData.product_type === 'ค่าอื่นๆ' ? 'text-slate-700' : 'text-slate-400'}">ค่าอื่นๆ</span>
+												<span
+													class="text-xs font-black {formData.product_type === 'ค่าอื่นๆ'
+														? 'text-slate-700'
+														: 'text-slate-400'}">ค่าอื่นๆ</span
+												>
 											</button>
 										</div>
 									</div>
 
 									<div class="space-y-2 md:col-span-2">
-										<label for="edit-notes" class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400">หมายเหตุ</label>
+										<label
+											for="edit-notes"
+											class="ml-1 text-xs font-black uppercase tracking-widest text-slate-400"
+											>หมายเหตุ</label
+										>
 										<div class="relative">
 											<span class="absolute left-4 top-4 text-xl opacity-40">📝</span>
 											<textarea
 												id="edit-notes"
 												bind:value={formData.notes}
-												class="min-h-[120px] w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-medium text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+												class="min-h-[120px] w-full rounded-2xl bg-slate-50 py-4 pl-12 pr-4 text-lg font-medium text-slate-800 ring-1 ring-inset ring-slate-100 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
 											></textarea>
 										</div>
 									</div>
@@ -1924,7 +2394,7 @@
 										บันทึกการแก้ไข
 									</button>
 									<button
-										class="flex-1 rounded-[1.5rem] bg-slate-100 py-5 text-lg font-black text-slate-500 hover:bg-slate-200 transition-all"
+										class="flex-1 rounded-[1.5rem] bg-slate-100 py-5 text-lg font-black text-slate-500 transition-all hover:bg-slate-200"
 										on:click={closeEditModal}
 									>
 										ยกเลิก
@@ -1948,65 +2418,85 @@
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">
 								<span class="text-xl">📋</span>
-								<h2 class="text-xl font-bold text-gray-800">การลงทุนทั้งหมด ({filteredInvestments.length})</h2>
+								<h2 class="text-xl font-bold text-gray-800">
+									การลงทุนทั้งหมด ({filteredInvestments.length})
+								</h2>
 							</div>
 							<div class="text-sm font-medium text-slate-500">
 								Showing {filteredInvestments.length} from {investments.length} items
 							</div>
 						</div>
 
-							<!-- Filter Results Info -->
+						<!-- Filter Results Info -->
 
-							<div class="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
-								<span
-									>แสดงผล: <strong class="text-pink-600">{filteredInvestments.length}</strong> จาก
-									<strong>{investments.length}</strong> รายการ</span
-								>
-								{#if filterStatus !== 'all'}
-									<span class="rounded-full bg-pink-100 px-2 py-1 text-pink-800">
-										สถานะ: {filterStatus === 'active'
-											? 'กำลังดำเนินการ'
-											: filterStatus === 'completed'
-												? 'เสร็จสิ้น'
-												: 'ยกเลิก'}
-									</span>
-								{/if}
-								{#if searchQuery.trim()}
-									<span class="rounded-full bg-blue-100 px-2 py-1 text-blue-800">
-										ค้นหา: "{searchQuery}"
-									</span>
-								{/if}
-							</div>
-
-
+						<div class="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
+							<span
+								>แสดงผล: <strong class="text-pink-600">{filteredInvestments.length}</strong> จาก
+								<strong>{investments.length}</strong> รายการ</span
+							>
+							{#if filterStatus !== 'all'}
+								<span class="rounded-full bg-pink-100 px-2 py-1 text-pink-800">
+									สถานะ: {filterStatus === 'active'
+										? 'กำลังดำเนินการ'
+										: filterStatus === 'completed'
+											? 'เสร็จสิ้น'
+											: 'ยกเลิก'}
+								</span>
+							{/if}
+							{#if searchQuery.trim()}
+								<span class="rounded-full bg-blue-100 px-2 py-1 text-blue-800">
+									ค้นหา: "{searchQuery}"
+								</span>
+							{/if}
+						</div>
 
 						{#each filteredInvestments as investment (investment.id)}
-							<div class="group relative overflow-hidden rounded-[1.5rem] bg-white ring-1 ring-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl">
+							<div
+								class="group relative overflow-hidden rounded-[1.5rem] bg-white shadow-lg ring-1 ring-slate-200 transition-all duration-300 hover:shadow-xl"
+							>
 								<div class="relative p-5 sm:p-8">
 									<!-- Header Area: More Compact -->
 									<div class="mb-5 flex items-start justify-between">
 										<div class="flex items-center gap-3">
-											<div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-xl shadow-inner transition-transform group-hover:rotate-6">
-												{#if investment.product_type === 'ค่าส่ง'} 📦
-												{:else if investment.product_type === 'ค่าลิซ่า'} 💌
-												{:else if investment.product_type === 'ค่าคอลแลป'} 🤝
-												{:else if investment.product_type === 'ค่าอื่นๆ'} 📋
-												{:else} 💼 {/if}
+											<div
+												class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-xl shadow-inner transition-transform group-hover:rotate-6"
+											>
+												{#if investment.product_type === 'ค่าลงทุน' || !investment.product_type}
+													💰
+												{:else if investment.product_type === 'ค่าส่ง'}
+													📦
+												{:else if investment.product_type === 'ค่าลิซ่า'}
+													💌
+												{:else if investment.product_type === 'ค่าคอลแลป'}
+													🤝
+												{:else if investment.product_type === 'ค่าอื่นๆ'}
+													📋
+												{:else}
+													💰
+												{/if}
 											</div>
 											<div class="min-w-0">
-												<h4 class="truncate text-lg font-black text-slate-800 tracking-tight">
-													{investment.product_type || 'การลงทุน'}
+												<h4 class="truncate text-lg font-black tracking-tight text-slate-800">
+													{investment.product_type || 'ค่าลงทุน'}
 													<span class="text-indigo-400 opacity-60">#{investment.id}</span>
 												</h4>
-												<p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{new Date(investment.start_date).toLocaleDateString('th-TH')}</p>
+												<p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+													{new Date(investment.start_date).toLocaleDateString('th-TH')}
+												</p>
 											</div>
 										</div>
 
-										<span class="flex-shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm
+										<span
+											class="flex-shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm
 											{investment.status === 'active' ? 'bg-amber-100 text-amber-700' : ''}
 											{investment.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : ''}
-											{investment.status === 'cancelled' ? 'bg-slate-100 text-slate-700' : ''}">
-											{investment.status === 'active' ? 'Active' : investment.status === 'completed' ? 'Done' : 'N/A'}
+											{investment.status === 'cancelled' ? 'bg-slate-100 text-slate-700' : ''}"
+										>
+											{investment.status === 'active'
+												? 'Active'
+												: investment.status === 'completed'
+													? 'Done'
+													: 'N/A'}
 										</span>
 									</div>
 
@@ -2014,26 +2504,50 @@
 									<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
 										<!-- Invested -->
 										<div class="rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-100">
-											<div class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">ลงทุน</div>
-											<div class="text-sm font-black text-slate-800">฿{parseFloat(investment.amount).toLocaleString()}</div>
+											<div
+												class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400"
+											>
+												ลงทุน
+											</div>
+											<div class="text-sm font-black text-slate-800">
+												฿{parseFloat(investment.amount).toLocaleString()}
+											</div>
 										</div>
 
 										<!-- Received -->
-										<div class="relative rounded-xl bg-emerald-50/50 p-3 ring-1 ring-inset ring-emerald-100">
-											<div class="mb-1 text-[9px] font-black uppercase tracking-widest text-emerald-600/60">ได้รับ</div>
+										<div
+											class="relative rounded-xl bg-emerald-50/50 p-3 ring-1 ring-inset ring-emerald-100"
+										>
+											<div
+												class="mb-1 text-[9px] font-black uppercase tracking-widest text-emerald-600/60"
+											>
+												ได้รับ
+											</div>
 											<div class="flex items-center justify-between gap-1">
-												<div class="truncate text-sm font-black text-emerald-600">฿{(investment.current_received || 0).toLocaleString()}</div>
+												<div class="truncate text-sm font-black text-emerald-600">
+													฿{(investment.current_received || 0).toLocaleString()}
+												</div>
 												<button
 													class="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500 text-[10px] text-white shadow-sm hover:bg-emerald-600"
-													on:click={() => quickUpdateReceived(investment)}>+</button>
+													on:click={() => quickUpdateReceived(investment)}>+</button
+												>
 											</div>
 										</div>
 
 										<!-- ROI -->
 										<div class="rounded-xl bg-indigo-50/50 p-3 ring-1 ring-inset ring-indigo-100">
-											<div class="mb-1 text-[9px] font-black uppercase tracking-widest text-indigo-600/60">กำไร</div>
+											<div
+												class="mb-1 text-[9px] font-black uppercase tracking-widest text-indigo-600/60"
+											>
+												กำไร
+											</div>
 											{#if calculateROI(investment)}
-												<div class="text-sm font-black {parseFloat(calculateROI(investment) || '0') >= 0 ? 'text-indigo-600' : 'text-rose-600'}">
+												<div
+													class="text-sm font-black {parseFloat(calculateROI(investment) || '0') >=
+													0
+														? 'text-indigo-600'
+														: 'text-rose-600'}"
+												>
 													{calculateROI(investment)}%
 												</div>
 											{:else}
@@ -2043,29 +2557,49 @@
 
 										<!-- Target -->
 										<div class="rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-100">
-											<div class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">เป้าหมาย</div>
-											<div class="text-sm font-black text-slate-800 truncate">
-												{investment.expected_return ? '฿' + parseFloat(investment.expected_return).toLocaleString() : '-'}
+											<div
+												class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400"
+											>
+												เป้าหมาย
+											</div>
+											<div class="truncate text-sm font-black text-slate-800">
+												{investment.expected_return
+													? '฿' + parseFloat(investment.expected_return).toLocaleString()
+													: '-'}
 											</div>
 										</div>
 
 										<!-- Duration (Mobile Optimized hide/smaller) -->
 										<div class="rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-100">
-											<div class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">ระยะเวลา</div>
-											<div class="text-sm font-black text-slate-800">{calculateDaysRunning(investment.start_date)} วัน</div>
+											<div
+												class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400"
+											>
+												ระยะเวลา
+											</div>
+											<div class="text-sm font-black text-slate-800">
+												{calculateDaysRunning(investment.start_date)} วัน
+											</div>
 										</div>
 
 										<!-- End Date / Status -->
 										<div class="rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-100">
-											<div class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">สิ้นสุด</div>
-											<div class="text-xs font-black text-slate-800">{investment.end_date || '-'}</div>
+											<div
+												class="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400"
+											>
+												สิ้นสุด
+											</div>
+											<div class="text-xs font-black text-slate-800">
+												{investment.end_date || '-'}
+											</div>
 										</div>
 									</div>
 
 									<!-- Slim Progress Section -->
 									{#if investment.status === 'active' && investment.expected_return}
 										<div class="mt-4">
-											<div class="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+											<div
+												class="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-widest"
+											>
 												<span class="text-slate-400">Progress</span>
 												<span class="text-indigo-600">{calculateProgress(investment)}%</span>
 											</div>
@@ -2081,28 +2615,32 @@
 									<!-- Action Buttons: Tighter Row -->
 									<div class="mt-5 flex gap-2">
 										<button
-											class="flex-1 rounded-xl bg-slate-900 py-3 text-xs font-black text-white hover:bg-slate-800 active:scale-95 transition-all"
-											on:click={() => startEdit(investment)}>
+											class="flex-1 rounded-xl bg-slate-900 py-3 text-xs font-black text-white transition-all hover:bg-slate-800 active:scale-95"
+											on:click={() => startEdit(investment)}
+										>
 											แก้ไข
 										</button>
 
 										{#if investment.status === 'active'}
 											<button
-												class="flex-1 rounded-xl bg-emerald-500 py-3 text-xs font-black text-white hover:bg-emerald-600 active:scale-95 transition-all"
-												on:click={() => updateInvestmentStatus(investment.id, 'completed')}>
+												class="flex-1 rounded-xl bg-emerald-500 py-3 text-xs font-black text-white transition-all hover:bg-emerald-600 active:scale-95"
+												on:click={() => updateInvestmentStatus(investment.id, 'completed')}
+											>
 												จบ
 											</button>
 										{:else}
 											<button
-												class="flex-1 rounded-xl bg-indigo-500 py-3 text-xs font-black text-white hover:bg-indigo-600 active:scale-95 transition-all"
-												on:click={() => updateInvestmentStatus(investment.id, 'active')}>
+												class="flex-1 rounded-xl bg-indigo-500 py-3 text-xs font-black text-white transition-all hover:bg-indigo-600 active:scale-95"
+												on:click={() => updateInvestmentStatus(investment.id, 'active')}
+											>
 												เปิด
 											</button>
 										{/if}
 
 										<button
 											class="flex h-[44px] w-[20%] items-center justify-center rounded-xl bg-rose-50 text-rose-500 ring-1 ring-rose-100 transition-all hover:bg-rose-500 hover:text-white"
-											on:click={() => deleteInvestment(investment.id)}>
+											on:click={() => deleteInvestment(investment.id)}
+										>
 											🗑️
 										</button>
 									</div>
@@ -2301,14 +2839,14 @@
 											<!-- Details -->
 											<div class="mt-3 border-t border-gray-200 pt-3">
 												<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-														{#if log.investments}
-											<div class="flex items-center gap-1">
-												<span class="text-gray-500">🏷️ การลงทุน:</span>
-												<span class="font-medium">
-													{log.investments.product_type || `#${log.investment_id}`}
-												</span>
-											</div>
-										{/if}
+													{#if log.investments}
+														<div class="flex items-center gap-1">
+															<span class="text-gray-500">🏷️ การลงทุน:</span>
+															<span class="font-medium">
+																{log.investments.product_type || `#${log.investment_id}`}
+															</span>
+														</div>
+													{/if}
 												</div>
 												{#if log.notes}
 													<p class="mt-2 text-sm text-gray-600">
