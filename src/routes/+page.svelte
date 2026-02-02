@@ -41,7 +41,9 @@
 	let periodSortDirection = 'desc'; // 'asc' | 'desc'
 	let sortOrder = 'latest'; // 'latest' | 'oldest' | 'amount_high' | 'amount_low'
 	let summaryType = 'investments'; // 'investments' | 'logs'
-	let showMobilePeriodSummaries = false; // NEW: Toggle monthly cards on mobile
+	let showMobilePeriodSummaries = false; // Toggle monthly cards on mobile
+	let categoryStatsTimeframe = 'all'; // 'week' | 'month' | 'all' for category statistics
+	let selectedMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM' format for month picker
 
 	// Form data
 	let formData = {
@@ -814,6 +816,95 @@
 			}))
 			.sort((a, b) => b.amount - a.amount);
 	}
+
+	// Category Statistics by Timeframe (Week, Month, All)
+	function getCategoryStatsByTimeframe(invs: any[], timeframe: string, monthStr: string) {
+		const now = new Date();
+		let startDate: Date;
+		let endDate: Date = new Date(9999, 11, 31); // Far future
+
+		if (timeframe === 'week') {
+			startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+		} else if (timeframe === 'month') {
+			// Use selected month (YYYY-MM format)
+			const [year, month] = monthStr.split('-').map(Number);
+			startDate = new Date(year, month - 1, 1);
+			endDate = new Date(year, month, 0, 23, 59, 59); // Last day of selected month
+		} else {
+			startDate = new Date(0); // All time
+		}
+
+		const filteredInvs = (invs || []).filter((inv) => {
+			if (!inv || !inv.start_date) return false;
+			const invDate = new Date(inv.start_date);
+			return invDate >= startDate && invDate <= endDate;
+		});
+
+		const categoryStats: Record<
+			string,
+			{
+				count: number;
+				invested: number;
+				received: number;
+				profit: number;
+				emoji: string;
+			}
+		> = {};
+
+		const categoryEmojis: Record<string, string> = {
+			ค่าลงทุน: '💰',
+			ค่าส่ง: '📦',
+			ค่าลิซ่า: '💌',
+			ค่าคอลแลป: '🤝',
+			ค่าอื่นๆ: '📋'
+		};
+
+		filteredInvs.forEach((inv) => {
+			const category = inv.product_type || 'ค่าลงทุน';
+			if (!categoryStats[category]) {
+				categoryStats[category] = {
+					count: 0,
+					invested: 0,
+					received: 0,
+					profit: 0,
+					emoji: categoryEmojis[category] || '💰'
+				};
+			}
+			categoryStats[category].count += 1;
+			categoryStats[category].invested += parseFloat(inv.amount || 0);
+			categoryStats[category].received += parseFloat(inv.current_received || 0);
+		});
+
+		// Calculate profit and sort by invested descending
+		const result = Object.entries(categoryStats)
+			.map(([category, data]) => ({
+				category,
+				...data,
+				profit: data.received - data.invested,
+				roi: data.invested > 0 ? ((data.received - data.invested) / data.invested) * 100 : 0
+			}))
+			.sort((a, b) => b.invested - a.invested);
+
+		// Calculate totals
+		const totals = result.reduce(
+			(acc, item) => ({
+				count: acc.count + item.count,
+				invested: acc.invested + item.invested,
+				received: acc.received + item.received,
+				profit: acc.profit + item.profit
+			}),
+			{ count: 0, invested: 0, received: 0, profit: 0 }
+		);
+
+		return { categories: result, totals };
+	}
+
+	// Reactive category stats
+	$: categoryStats = getCategoryStatsByTimeframe(
+		investments,
+		categoryStatsTimeframe,
+		selectedMonth
+	);
 
 	// Transaction History Functions
 	async function loadTransactionLogs(investmentId: number | null = null) {
@@ -1749,35 +1840,233 @@
 								</div>
 							</div>
 
-							<!-- Product Type Analysis -->
-							<div class="chart-card full-width">
-								<h3 class="chart-title">🛍️ วิเคราะห์ตามประเภทสินค้า</h3>
-								<div class="chart-content">
-									{#if chartData.productTypeData.length > 0}
-										<div class="product-table">
-											<div class="table-header">
-												<div>ประเภทสินค้า</div>
-												<div>จำนวนรอบ</div>
-												<div>เงินลงทุน</div>
-												<div>เงินที่ได้รับ</div>
-												<div>ROI</div>
-											</div>
-											{#each chartData.productTypeData as item}
-												<div class="table-row">
-													<div class="product-name">{item.type}</div>
-													<div class="product-count">{item.count}</div>
-													<div class="product-amount">{item.amount.toLocaleString()}</div>
-													<div class="product-received">{item.received.toLocaleString()}</div>
-													<div class="product-roi {item.roi >= 0 ? 'positive' : 'negative'}">
-														{item.roi.toFixed(1)}%
+							<!-- Category Statistics by Timeframe (NEW) -->
+							<div
+								class="chart-card full-width"
+								style="background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);"
+							>
+								<div
+									class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+								>
+									<h3 class="chart-title m-0 flex items-center gap-2">
+										📊 สถิติตามประเภท
+										<span class="text-xs font-normal text-slate-400">
+											{categoryStatsTimeframe === 'week'
+? '(7 วันล่าสุด)'
+: categoryStatsTimeframe === 'month'
+? `(${new Date(selectedMonth + '-01').toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })})`
+: '(ทั้งหมด)'}
+										</span>
+									</h3>
+									<div class="flex gap-2 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+										<button
+											class="rounded-lg px-4 py-2 text-xs font-bold transition-all {categoryStatsTimeframe ===
+											'week'
+												? 'bg-indigo-600 text-white shadow-md'
+												: 'text-slate-500 hover:bg-slate-50'}"
+											on:click={() => (categoryStatsTimeframe = 'week')}
+										>
+											📅 สัปดาห์
+										</button>
+										<button
+											class="rounded-lg px-4 py-2 text-xs font-bold transition-all {categoryStatsTimeframe ===
+											'month'
+												? 'bg-indigo-600 text-white shadow-md'
+												: 'text-slate-500 hover:bg-slate-50'}"
+											on:click={() => (categoryStatsTimeframe = 'month')}
+										>
+											📆 เดือน
+										</button>
+										<button
+											class="rounded-lg px-4 py-2 text-xs font-bold transition-all {categoryStatsTimeframe ===
+											'all'
+												? 'bg-indigo-600 text-white shadow-md'
+												: 'text-slate-500 hover:bg-slate-50'}"
+											on:click={() => (categoryStatsTimeframe = 'all')}
+										>
+											🗓️ ทั้งหมด
+										</button>
+									</div>
+</div>
+
+<!-- Month Picker (visible when month mode is selected) -->
+{#if categoryStatsTimeframe === 'month'}
+<div class="flex items-center justify-center gap-2 mb-4 flex-wrap">
+<button
+class="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-slate-700"
+on:click={() => {
+const [y, m] = selectedMonth.split('-').map(Number);
+const prevMonth = m === 1 ? 12 : m - 1;
+const prevYear = m === 1 ? y - 1 : y;
+selectedMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+}}
+>
+←
+</button>
+<input
+type="month"
+bind:value={selectedMonth}
+class="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+/>
+<button
+class="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-slate-700"
+on:click={() => {
+const [y, m] = selectedMonth.split('-').map(Number);
+const nextMonth = m === 12 ? 1 : m + 1;
+const nextYear = m === 12 ? y + 1 : y;
+selectedMonth = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+}}
+>
+→
+</button>
+<button
+class="ml-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-600 transition-all hover:bg-indigo-100"
+on:click={() => selectedMonth = new Date().toISOString().slice(0, 7)}
+>
+เดือนนี้
+</button>
+</div>
+{/if}
+
+{#if categoryStats.categories.length > 0}
+									<!-- Category Cards Grid -->
+									<div
+										class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+									>
+										{#each categoryStats.categories as cat, index}
+											<div
+												class="relative rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100 transition-all hover:-translate-y-1 hover:shadow-lg sm:p-5"
+											>
+												<!-- Rank Badge -->
+												<div
+													class="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-black text-white shadow-md sm:h-8 sm:w-8 sm:text-sm"
+												>
+													#{index + 1}
+												</div>
+
+												<!-- Category Header -->
+												<div class="mb-3 flex items-center gap-2 pr-8 sm:mb-4 sm:gap-3">
+													<div
+														class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xl shadow-inner sm:h-12 sm:w-12 sm:text-2xl"
+													>
+														{cat.emoji}
+													</div>
+													<div>
+														<h4 class="text-sm font-black text-slate-800">{cat.category}</h4>
+														<p class="text-xs text-slate-400">{cat.count} รายการ</p>
 													</div>
 												</div>
-											{/each}
+
+												<!-- Stats -->
+												<div class="space-y-3">
+													<div class="flex items-center justify-between">
+														<span class="text-xs text-slate-400">ลงทุน</span>
+														<span class="text-sm font-bold text-slate-700"
+															>฿{cat.invested.toLocaleString()}</span
+														>
+													</div>
+													<div class="flex items-center justify-between">
+														<span class="text-xs text-slate-400">ได้รับ</span>
+														<span class="text-sm font-bold text-emerald-600"
+															>฿{cat.received.toLocaleString()}</span
+														>
+													</div>
+													<div class="flex items-center justify-between">
+														<span class="text-xs text-slate-400">กำไร/ขาดทุน</span>
+														<span
+															class="text-sm font-black {cat.profit >= 0
+																? 'text-emerald-600'
+																: 'text-rose-500'}"
+														>
+															{cat.profit >= 0 ? '+' : ''}฿{cat.profit.toLocaleString()}
+														</span>
+													</div>
+
+													<!-- Progress Bar -->
+													<div class="pt-2">
+														<div class="h-2 overflow-hidden rounded-full bg-slate-100">
+															<div
+																class="h-full rounded-full transition-all duration-500 {cat.profit >=
+																0
+																	? 'bg-gradient-to-r from-emerald-400 to-teal-500'
+																	: 'bg-gradient-to-r from-rose-400 to-pink-500'}"
+																style="width: {categoryStats.totals.invested > 0
+																	? Math.min(
+																			(cat.invested / categoryStats.totals.invested) * 100,
+																			100
+																		)
+																	: 0}%"
+															></div>
+														</div>
+														<p class="mt-1 text-center text-[10px] text-slate-400">
+															{categoryStats.totals.invested > 0
+																? ((cat.invested / categoryStats.totals.invested) * 100).toFixed(1)
+																: 0}% ของทั้งหมด
+														</p>
+													</div>
+												</div>
+											</div>
+										{/each}
+									</div>
+
+									<!-- Totals Summary -->
+									<div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+										<h4 class="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
+											📈 สรุปรวม ({categoryStatsTimeframe === 'week'
+												? 'สัปดาห์นี้'
+												: categoryStatsTimeframe === 'month'
+													? 'เดือนนี้'
+													: 'ทั้งหมด'})
+										</h4>
+										<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+											<div class="rounded-xl bg-slate-50 p-3 text-center">
+												<p class="text-2xl font-black text-slate-800">
+													{categoryStats.totals.count}
+												</p>
+												<p class="text-xs text-slate-400">รายการ</p>
+											</div>
+											<div class="rounded-xl bg-indigo-50 p-3 text-center">
+												<p class="text-xl font-black text-indigo-700">
+													฿{categoryStats.totals.invested.toLocaleString()}
+												</p>
+												<p class="text-xs text-indigo-400">ลงทุนรวม</p>
+											</div>
+											<div class="rounded-xl bg-emerald-50 p-3 text-center">
+												<p class="text-xl font-black text-emerald-700">
+													฿{categoryStats.totals.received.toLocaleString()}
+												</p>
+												<p class="text-xs text-emerald-400">ได้รับรวม</p>
+											</div>
+											<div
+												class="rounded-xl p-3 text-center {categoryStats.totals.profit >= 0
+													? 'bg-emerald-50'
+													: 'bg-rose-50'}"
+											>
+												<p
+													class="text-xl font-black {categoryStats.totals.profit >= 0
+														? 'text-emerald-700'
+														: 'text-rose-600'}"
+												>
+													{categoryStats.totals.profit >= 0
+														? '+'
+														: ''}฿{categoryStats.totals.profit.toLocaleString()}
+												</p>
+												<p
+													class="text-xs {categoryStats.totals.profit >= 0
+														? 'text-emerald-400'
+														: 'text-rose-400'}"
+												>
+													กำไร/ขาดทุน
+												</p>
+											</div>
 										</div>
-									{:else}
-										<p class="no-data">ยังไม่มีข้อมูลประเภทสินค้า</p>
-									{/if}
-								</div>
+									</div>
+								{:else}
+									<div class="py-12 text-center">
+										<div class="mb-4 text-5xl opacity-50">📊</div>
+										<p class="text-slate-400">ไม่มีข้อมูลในช่วงเวลานี้</p>
+									</div>
+								{/if}
 							</div>
 						</div>
 					</section>
