@@ -3,6 +3,7 @@
 	import { supabase } from '$lib/supabase';
 	import { fade, slide, scale } from 'svelte/transition';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 
 	// Types
 	interface Product {
@@ -447,6 +448,11 @@
 		};
 		window.addEventListener('click', handleClickOutside);
 		return () => window.removeEventListener('click', handleClickOutside);
+	});
+
+	$effect(() => {
+		const tab = page.url.searchParams.get('tab');
+		activeTab = tab === 'preorders' ? 'preorders' : 'products';
 	});
 
 	$effect(() => {
