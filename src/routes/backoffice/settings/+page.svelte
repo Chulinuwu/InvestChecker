@@ -23,6 +23,12 @@
 	let pricePerItem = $state(50);
 	let pricePerSet = $state(150);
 
+	// Broadcast State
+	let broadcastMessage = $state('');
+	let broadcasting = $state(false);
+	let broadcastSuccess = $state(false);
+	let broadcastError = $state('');
+
 	// Fetch Config
 	async function fetchConfigs() {
 		loading = true;
@@ -92,6 +98,38 @@
 			alert('เกิดข้อผิดพลาดในการบันทึก');
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function sendBroadcast() {
+		if (!broadcastMessage.trim()) return;
+		if (!confirm('ยืนยันการส่งข้อความหาลูกค้าทุกคน? การดำเนินการนี้ไม่สามารถยกเลิกได้')) return;
+
+		broadcasting = true;
+		broadcastError = '';
+		broadcastSuccess = false;
+
+		try {
+			const backendUrl = import.meta.env.VITE_BACKEND_URL;
+			const response = await fetch(`${backendUrl}/api/broadcast`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ message: broadcastMessage })
+			});
+
+			const result = await response.json();
+			if (result.success) {
+				broadcastSuccess = true;
+				broadcastMessage = '';
+				setTimeout(() => (broadcastSuccess = false), 5000);
+			} else {
+				broadcastError = result.error || 'Failed to send broadcast';
+			}
+		} catch (error) {
+			console.error('Error sending broadcast:', error);
+			broadcastError = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
+		} finally {
+			broadcasting = false;
 		}
 	}
 
@@ -319,6 +357,118 @@
 							/>
 						</svg>
 						<span class="text-xs font-bold">Changes saved successfully</span>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Broadcast Section -->
+		<div class="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200" transition:fade>
+			<div class="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+				<div
+					class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600"
+				>
+					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.167H3.382a.745.745 0 01-.738-.63l-.33-2.61a.742.742 0 01.738-.85h2.155l2.147-6.167a1.76 1.76 0 013.417.592zM17.273 19.21a8.387 8.387 0 01-2.488-2.352M19.063 15.342a8.381 8.381 0 01-.227-4.63M16.516 4.791a8.382 8.382 0 012.77 2.062"
+						/>
+					</svg>
+				</div>
+				<div>
+					<h3 class="font-bold text-slate-800">ประกาศข่าวสาร (Broadcast)</h3>
+					<p class="text-xs text-slate-400">ส่งข้อความหาลูกค้าทุกคนที่ติดตามบอทอยู่ทันที</p>
+				</div>
+			</div>
+
+			<div class="space-y-4">
+				<div class="relative">
+					<textarea
+						bind:value={broadcastMessage}
+						oninput={(e) => {
+							const target = e.currentTarget;
+							target.style.height = 'auto';
+							target.style.height = target.scrollHeight + 'px';
+						}}
+						placeholder="พิมพ์ข้อความที่ต้องการแจ้งลูกค้าทุกคนที่นี่... (น้องทเวนตี้จะส่งหาทุกคนทันทีนะค๊าา)"
+						rows="4"
+						class="w-full resize-none overflow-hidden rounded-2xl border-slate-200 bg-slate-50/50 p-4 text-sm transition-all focus:border-amber-500 focus:bg-white focus:ring-amber-500"
+					></textarea>
+				</div>
+
+				<div class="flex items-center justify-between">
+					<p class="text-[10px] text-slate-400">
+						* โปรดตรวจสอบข้อความให้ถี่ถ้วนก่อนกดส่ง เนื่องจากเป็นการส่งหาลูกค้าจำนวนมาก
+					</p>
+					<button
+						onclick={sendBroadcast}
+						disabled={broadcasting || !broadcastMessage.trim()}
+						class="flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-amber-100 transition-all hover:bg-amber-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+					>
+						{#if broadcasting}
+							<svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+								<circle
+									class="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="4"
+								></circle>
+								<path
+									class="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								></path>
+							</svg>
+							Sending...
+						{:else}
+							<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+								/>
+							</svg>
+							Broadcast Message
+						{/if}
+					</button>
+				</div>
+
+				{#if broadcastSuccess}
+					<div
+						class="mt-2 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-emerald-600"
+						transition:slide
+					>
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
+						</svg>
+						<span class="text-xs font-bold">ส่งประกาศให้ทุกคนสำเร็จแล้วนะค๊าา! ✨ ✅</span>
+					</div>
+				{/if}
+
+				{#if broadcastError}
+					<div
+						class="mt-2 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-rose-600"
+						transition:slide
+					>
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
+						</svg>
+						<span class="text-xs font-bold">Error: {broadcastError}</span>
 					</div>
 				{/if}
 			</div>
