@@ -37,12 +37,17 @@
 
 			// ส่งข้อความแจ้งเตือนผ่านบอท
 			try {
-				const backendUrl = import.meta.env.VITE_BACKEND_URL;
-				await fetch(`${backendUrl}/api/notify-verification`, {
+				const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+				console.log('Notifying verification status...', { userLineId, status, backendUrl });
+
+				const response = await fetch(`${backendUrl}/api/notify-verification`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ userLineId, status })
 				});
+
+				const result = await response.json();
+				console.log('Verification notification result:', result);
 			} catch (notifyError) {
 				console.error('Failed to send notification:', notifyError);
 			}
