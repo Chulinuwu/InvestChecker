@@ -746,6 +746,7 @@
 										<button
 											type="button"
 											onclick={() => removeProductFromSet(index)}
+											aria-label="Remove product from set"
 											class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
 										>
 											<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
