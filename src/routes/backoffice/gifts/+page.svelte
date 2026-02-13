@@ -215,35 +215,34 @@
 <main class="mx-auto max-w-7xl px-4 py-8 md:px-8">
 	<!-- Header & Actions -->
 	<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-		<div>
-			<h2 class="text-2xl font-bold text-slate-800">Redeemable Gifts</h2>
-			<p class="text-sm text-slate-500">Manage items customers can exchange with points</p>
+		<div class="relative w-full md:w-96">
+			<input
+				type="text"
+				placeholder="Search gifts..."
+				bind:value={searchTerm}
+				class="w-full rounded-xl border-0 bg-white py-3 pl-11 pr-4 shadow-sm ring-1 ring-slate-200 transition-all focus:ring-2 focus:ring-indigo-500"
+			/>
+			<svg
+				class="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+				/>
+			</svg>
 		</div>
 		<div class="flex items-center gap-3">
-			<div class="relative w-full md:w-64">
-				<input
-					type="text"
-					placeholder="Search gifts..."
-					bind:value={searchTerm}
-					class="w-full rounded-xl border-0 bg-white py-2.5 pl-10 pr-4 text-sm shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500"
-				/>
-				<svg
-					class="absolute left-3 top-2.5 h-5 w-5 text-slate-400"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-					/>
-				</svg>
+			<div class="rounded-lg bg-indigo-50 px-4 py-2 text-xs font-medium text-indigo-600 sm:text-sm">
+				Total: {gifts.length}
 			</div>
 			<button
 				onclick={openAddModal}
-				class="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-95"
+				class="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-95"
 			>
 				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path

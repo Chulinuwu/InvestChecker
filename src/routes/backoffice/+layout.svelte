@@ -91,16 +91,6 @@
 					</button>
 					<button
 						class="flex-1 rounded-lg px-4 py-1.5 text-sm font-bold transition-all {isActive(
-							'/backoffice/settings'
-						)
-							? 'bg-white text-indigo-600 shadow-sm'
-							: 'text-slate-500 hover:text-slate-700'}"
-						onclick={() => goto('/backoffice/settings')}
-					>
-						Settings
-					</button>
-					<button
-						class="flex-1 rounded-lg px-4 py-1.5 text-sm font-bold transition-all {isActive(
 							'/backoffice/gifts'
 						)
 							? 'bg-white text-indigo-600 shadow-sm'
@@ -108,6 +98,16 @@
 						onclick={() => goto('/backoffice/gifts')}
 					>
 						Gifts
+					</button>
+					<button
+						class="flex-1 rounded-lg px-4 py-1.5 text-sm font-bold transition-all {isActive(
+							'/backoffice/settings'
+						)
+							? 'bg-white text-indigo-600 shadow-sm'
+							: 'text-slate-500 hover:text-slate-700'}"
+						onclick={() => goto('/backoffice/settings')}
+					>
+						Settings
 					</button>
 				</div>
 			</div>
