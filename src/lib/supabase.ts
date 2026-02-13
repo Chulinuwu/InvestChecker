@@ -236,6 +236,18 @@ export const lineUserService = {
 		return data[0];
 	},
 
+	// อัปเดตคะแนน
+	async updatePoints(userLineId: string, points: number) {
+		const { data, error } = await supabase
+			.from('line_users')
+			.update({ points })
+			.eq('user_line_id', userLineId)
+			.select();
+
+		if (error) throw error;
+		return data[0];
+	},
+
 	// ลบสมาชิก
 	async deleteLineUser(userLineId: string) {
 		const { error } = await supabase.from('line_users').delete().eq('user_line_id', userLineId);

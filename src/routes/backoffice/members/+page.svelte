@@ -10,6 +10,7 @@
 		picture_url: string | null;
 		birth_date_text: string | null;
 		verification_status: 'unregistered' | 'pending' | 'approved' | 'rejected';
+		points: number;
 		created_at: string;
 	}
 
@@ -54,6 +55,19 @@
 		} catch (error) {
 			console.error('Error updating status:', error);
 			alert('Failed to update status');
+		}
+	}
+
+	async function setPoints(userLineId: string, newPoints: number) {
+		if (newPoints < 0) return;
+		try {
+			await lineUserService.updatePoints(userLineId, newPoints);
+			members = members.map((m) =>
+				m.user_line_id === userLineId ? { ...m, points: newPoints } : m
+			);
+		} catch (error) {
+			console.error('Error updating points:', error);
+			alert('Failed to update points');
 		}
 	}
 
@@ -152,6 +166,9 @@
 						<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400"
 							>Joined</th
 						>
+						<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400"
+							>Points</th
+						>
 						<th
 							class="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-400"
 							>Actions</th
@@ -201,6 +218,15 @@
 							</td>
 							<td class="px-6 py-4 text-sm text-slate-500">
 								{new Date(member.created_at).toLocaleDateString('th-TH')}
+							</td>
+							<td class="px-6 py-4">
+								<input
+									type="number"
+									min="0"
+									value={member.points || 0}
+									onchange={(e) => setPoints(member.user_line_id, parseInt(e.currentTarget.value))}
+									class="w-20 rounded-lg border-0 bg-slate-50 px-2 py-1.5 text-center font-mono text-sm font-bold text-indigo-600 ring-1 ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500"
+								/>
 							</td>
 							<td class="px-6 py-4 text-right">
 								<div class="flex justify-end gap-2">
@@ -280,10 +306,20 @@
 						</span>
 					</div>
 
-					<div class="mb-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-center">
+					<div class="mb-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-center">
 						<div>
 							<p class="mb-0.5 text-[9px] font-bold uppercase text-slate-400">Birth Date</p>
 							<p class="text-xs font-bold text-slate-700">{member.birth_date_text || '-'}</p>
+						</div>
+						<div>
+							<p class="mb-0.5 text-[9px] font-bold uppercase text-slate-400">Points</p>
+							<input
+								type="number"
+								min="0"
+								value={member.points || 0}
+								onchange={(e) => setPoints(member.user_line_id, parseInt(e.currentTarget.value))}
+								class="w-16 rounded-lg border-0 bg-white px-1 py-1 text-center font-mono text-xs font-bold text-indigo-600 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500"
+							/>
 						</div>
 						<div>
 							<p class="mb-0.5 text-[9px] font-bold uppercase text-slate-400">Joined</p>
