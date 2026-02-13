@@ -61,67 +61,6 @@
 	);
 </script>
 
-<div class="min-h-screen bg-slate-50 pb-20 text-slate-900 md:pb-10">
-	<!-- Navbar -->
-	<nav class="sticky top-0 z-10 bg-white/80 px-3 py-3 backdrop-blur-md md:px-8 md:py-4">
-		<div class="mx-auto flex max-w-7xl items-center justify-between gap-2">
-			<div class="flex items-center gap-2">
-				<div
-					class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg"
-				>
-					<span class="text-base font-bold">TT</span>
-				</div>
-				<h1
-					class="hidden bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-xl font-bold text-transparent sm:block"
-				>
-					Backoffice
-				</h1>
-			</div>
-
-			<div class="flex rounded-lg bg-slate-100 p-1">
-				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
-					onclick={() => goto('/backoffice')}
-				>
-					Products
-				</button>
-				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
-					onclick={() => goto('/backoffice/sets')}
-				>
-					Sets
-				</button>
-				<button
-					class="w-20 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-28 sm:text-sm"
-					onclick={() => goto('/backoffice?tab=preorders')}
-				>
-					Pre-orders
-				</button>
-				<button
-					class="w-16 rounded-md bg-white py-1.5 text-[10px] font-medium text-indigo-600 shadow-sm transition-all sm:w-24 sm:text-sm"
-				>
-					Members
-				</button>
-				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
-					onclick={() => goto('/backoffice/settings')}
-				>
-					Settings
-				</button>
-			</div>
-
-			<button
-				onclick={() => {
-					localStorage.removeItem('isAdminAuthenticated');
-					goto('/');
-				}}
-				class="flex-shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 hover:text-red-500 sm:px-4 sm:py-2 sm:text-sm"
-			>
-				Logout
-			</button>
-		</div>
-	</nav>
-
 	<main class="mx-auto max-w-7xl px-4 py-8 md:px-8">
 		<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 			<div class="relative w-full md:w-96">
@@ -146,10 +85,12 @@
 				</svg>
 			</div>
 			<div class="flex items-center gap-2">
-				<div class="rounded-lg bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600">
+				<div
+					class="rounded-lg bg-indigo-50 px-4 py-2 text-xs font-medium text-indigo-600 sm:text-sm"
+				>
 					Total: {members.length}
 				</div>
-				<div class="rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-amber-600">
+				<div class="rounded-lg bg-amber-50 px-4 py-2 text-xs font-medium text-amber-600 sm:text-sm">
 					Pending: {members.filter((m) => m.verification_status === 'pending').length}
 				</div>
 			</div>
@@ -182,7 +123,10 @@
 				<p class="text-sm text-slate-500">Wait for users to register via LINE bot</p>
 			</div>
 		{:else}
-			<div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+			<!-- Desktop View -->
+			<div
+				class="hidden overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:block"
+			>
 				<table class="w-full text-left">
 					<thead class="border-b border-slate-100 bg-slate-50/50">
 						<tr>
@@ -286,6 +230,92 @@
 						{/each}
 					</tbody>
 				</table>
+			</div>
+
+			<!-- Mobile View (Cards) -->
+			<div class="space-y-4 md:hidden">
+				{#each filteredMembers as member (member.user_line_id)}
+					<div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200" transition:fade>
+						<div class="mb-4 flex items-start justify-between">
+							<div class="flex items-center gap-3">
+								{#if member.picture_url}
+									<img
+										src={member.picture_url}
+										alt=""
+										class="h-12 w-12 rounded-full bg-slate-100 object-cover"
+									/>
+								{:else}
+									<div
+										class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-600"
+									>
+										<span class="text-sm font-bold">{member.display_name?.[0] || '?'}</span>
+									</div>
+								{/if}
+								<div>
+									<h3 class="font-bold text-slate-800">{member.display_name || 'Guest User'}</h3>
+									<p class="font-mono text-[10px] text-slate-400">{member.user_line_id}</p>
+								</div>
+							</div>
+							<span
+								class="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider
+								{member.verification_status === 'approved'
+									? 'bg-emerald-100 text-emerald-700'
+									: member.verification_status === 'rejected'
+										? 'bg-rose-100 text-rose-700'
+										: member.verification_status === 'pending'
+											? 'bg-amber-100 text-amber-700'
+											: 'bg-slate-100 text-slate-600'}"
+							>
+								{member.verification_status}
+							</span>
+						</div>
+
+						<div class="mb-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-center">
+							<div>
+								<p class="mb-0.5 text-[9px] font-bold uppercase text-slate-400">Birth Date</p>
+								<p class="text-xs font-bold text-slate-700">{member.birth_date_text || '-'}</p>
+							</div>
+							<div>
+								<p class="mb-0.5 text-[9px] font-bold uppercase text-slate-400">Joined</p>
+								<p class="text-xs font-bold text-slate-700">
+									{new Date(member.created_at).toLocaleDateString('th-TH')}
+								</p>
+							</div>
+						</div>
+
+						<div class="flex items-center gap-2">
+							{#if member.verification_status === 'pending' || member.verification_status === 'unregistered' || member.verification_status === 'rejected'}
+								<button
+									onclick={() => updateStatus(member.user_line_id, 'approved')}
+									class="flex-1 rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-sm active:scale-95"
+								>
+									Approve
+								</button>
+							{/if}
+							{#if member.verification_status === 'pending' || member.verification_status === 'approved'}
+								<button
+									onclick={() => updateStatus(member.user_line_id, 'rejected')}
+									class="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 active:scale-95"
+								>
+									Reject
+								</button>
+							{/if}
+							<button
+								onclick={() => deleteMember(member.user_line_id)}
+								class="rounded-xl border border-slate-200 p-2.5 text-slate-400 hover:text-rose-500"
+							>
+								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+									/>
+								</svg>
+							</button>
+						</div>
+					</div>
+				{/each}
 			</div>
 		{/if}
 	</main>

@@ -370,78 +370,51 @@
 	}
 </script>
 
-<div class="min-h-screen bg-slate-50 pb-20 text-slate-900 md:pb-10">
-	<!-- Navbar -->
-	<nav class="sticky top-0 z-10 bg-white/80 px-3 py-3 backdrop-blur-md md:px-8 md:py-4">
-		<div class="mx-auto flex max-w-7xl items-center justify-between gap-2">
-			<div class="flex items-center gap-2">
-				<div
-					class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg"
-				>
-					<span class="text-base font-bold">TT</span>
-				</div>
-				<h1
-					class="hidden bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-xl font-bold text-transparent sm:block"
-				>
-					Backoffice
-				</h1>
-			</div>
-
-			<div class="flex rounded-lg bg-slate-100 p-1">
-				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
-					onclick={() => goto('/backoffice')}
-				>
-					Products
-				</button>
-				<button
-					class="w-16 rounded-md bg-white py-1.5 text-[10px] font-medium text-indigo-600 shadow-sm transition-all sm:w-24 sm:text-sm"
-				>
-					Sets
-				</button>
-				<button
-					class="w-20 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-28 sm:text-sm"
-					onclick={() => goto('/backoffice?tab=preorders')}
-				>
-					Pre-orders
-				</button>
-				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
-					onclick={() => goto('/backoffice/members')}
-				>
-					Members
-				</button>
-				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
-					onclick={() => goto('/backoffice/settings')}
-				>
-					Settings
-				</button>
-			</div>
-
-			<button
-				onclick={() => {
-					localStorage.removeItem('isAdminAuthenticated');
-					goto('/');
-				}}
-				class="flex-shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 hover:text-red-500 sm:px-4 sm:py-2 sm:text-sm"
+<main class="mx-auto max-w-7xl px-4 py-8 md:px-8">
+	<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+		<div class="relative w-full md:w-96">
+			<input
+				type="text"
+				placeholder="Search sets..."
+				bind:value={searchTerm}
+				class="w-full rounded-xl border-0 bg-white py-3 pl-11 pr-4 shadow-sm ring-1 ring-slate-200 transition-all focus:ring-2 focus:ring-indigo-500"
+			/>
+			<svg
+				class="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
 			>
-				Logout
-			</button>
-		</div>
-	</nav>
-
-	<main class="mx-auto max-w-7xl px-4 py-8 md:px-8">
-		<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-			<div class="relative w-full md:w-96">
-				<input
-					type="text"
-					placeholder="Search sets..."
-					bind:value={searchTerm}
-					class="w-full rounded-xl border-0 bg-white py-3 pl-11 pr-4 shadow-sm ring-1 ring-slate-200 transition-all focus:ring-2 focus:ring-indigo-500"
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
 				/>
+			</svg>
+		</div>
+		<button
+			onclick={() => openModal('add')}
+			class="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-purple-200 transition-all hover:from-purple-700 hover:to-indigo-700 active:scale-95"
+		>
+			<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+			</svg>
+			Add Set
+		</button>
+	</div>
+
+	{#if loading}
+		<div class="flex justify-center py-20">
+			<div
+				class="h-10 w-10 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600"
+			></div>
+		</div>
+	{:else if filteredSets.length === 0}
+		<div class="flex flex-col items-center justify-center py-20 text-center">
+			<div class="mb-4 rounded-full bg-purple-100 p-4">
 				<svg
-					class="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400"
+					class="h-12 w-12 text-purple-500"
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke="currentColor"
@@ -450,206 +423,162 @@
 						stroke-linecap="round"
 						stroke-linejoin="round"
 						stroke-width="2"
-						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+						d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
 					/>
 				</svg>
 			</div>
-			<button
-				onclick={() => openModal('add')}
-				class="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-purple-200 transition-all hover:from-purple-700 hover:to-indigo-700 active:scale-95"
-			>
-				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 4v16m8-8H4"
-					/>
-				</svg>
-				Add Set
-			</button>
+			<h3 class="mb-2 text-lg font-bold text-slate-700">No Product Sets Yet</h3>
+			<p class="text-sm text-slate-500">Create your first product set to bundle items together</p>
 		</div>
-
-		{#if loading}
-			<div class="flex justify-center py-20">
+	{:else}
+		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+			{#each filteredSets as set (set.id)}
 				<div
-					class="h-10 w-10 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600"
-				></div>
-			</div>
-		{:else if filteredSets.length === 0}
-			<div class="flex flex-col items-center justify-center py-20 text-center">
-				<div class="mb-4 rounded-full bg-purple-100 p-4">
-					<svg
-						class="h-12 w-12 text-purple-500"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-						/>
-					</svg>
-				</div>
-				<h3 class="mb-2 text-lg font-bold text-slate-700">No Product Sets Yet</h3>
-				<p class="text-sm text-slate-500">Create your first product set to bundle items together</p>
-			</div>
-		{:else}
-			<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-				{#each filteredSets as set (set.id)}
-					<div
-						class="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg"
-						transition:fade
-					>
-						<!-- Badge -->
-						<div class="absolute left-3 top-3 z-10">
-							<span
-								class="rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg"
-							>
-								Set
-							</span>
-						</div>
-
-						<div
-							class="aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50"
+					class="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg"
+					transition:fade
+				>
+					<!-- Badge -->
+					<div class="absolute left-3 top-3 z-10">
+						<span
+							class="rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg"
 						>
-							{#if set.image_url}
-								<img
-									src={set.image_url}
-									alt={set.set_name}
-									class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-								/>
-							{:else}
-								<div
-									class="flex h-full w-full flex-col items-center justify-center text-purple-300"
-								>
-									<svg class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="1.5"
-											d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-										/>
-									</svg>
-									<span class="mt-2 text-sm font-medium">{set.items?.length || 0} items</span>
-								</div>
-							{/if}
-							<div class="absolute right-3 top-3">
-								<button
-									onclick={(e) => {
-										e.stopPropagation();
-										toggleActive(set);
-									}}
-									class="rounded-full px-3 py-1 text-xs font-medium backdrop-blur-md transition-colors {set.is_active
-										? 'bg-green-500/90 text-white'
-										: 'bg-slate-500/90 text-white'}"
-								>
-									{set.is_active ? 'Active' : 'Inactive'}
-								</button>
+							Set
+						</span>
+					</div>
+
+					<div
+						class="aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50"
+					>
+						{#if set.image_url}
+							<img
+								src={set.image_url}
+								alt={set.set_name}
+								class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+							/>
+						{:else}
+							<div class="flex h-full w-full flex-col items-center justify-center text-purple-300">
+								<svg class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="1.5"
+										d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+									/>
+								</svg>
+								<span class="mt-2 text-sm font-medium">{set.items?.length || 0} items</span>
 							</div>
-						</div>
-
-						<div class="p-4">
-							<div class="mb-2">
-								<p class="text-xs font-medium text-purple-500">{set.set_code}</p>
-								<h3 class="line-clamp-1 text-lg font-bold text-slate-800" title={set.set_name}>
-									{set.set_name}
-								</h3>
-							</div>
-
-							<!-- Items in set -->
-							<div class="mb-3">
-								<p class="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-									Items in set ({set.items?.length || 0})
-								</p>
-								<div class="flex flex-wrap gap-1">
-									{#each (set.items || []).slice(0, 3) as item}
-										<span
-											class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
-										>
-											{item.product?.product_code} x{item.quantity}
-										</span>
-									{/each}
-									{#if (set.items?.length || 0) > 3}
-										<span
-											class="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-600"
-										>
-											+{(set.items?.length || 0) - 3} more
-										</span>
-									{/if}
-								</div>
-							</div>
-
-							<p class="mb-4 line-clamp-2 min-h-[2.5em] text-sm text-slate-500">
-								{set.description || 'No description available'}
-							</p>
-
-							<div
-								class="mb-4 flex items-center justify-between rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 p-3"
+						{/if}
+						<div class="absolute right-3 top-3">
+							<button
+								onclick={(e) => {
+									e.stopPropagation();
+									toggleActive(set);
+								}}
+								class="rounded-full px-3 py-1 text-xs font-medium backdrop-blur-md transition-colors {set.is_active
+									? 'bg-green-500/90 text-white'
+									: 'bg-slate-500/90 text-white'}"
 							>
-								<div>
-									<p class="text-[10px] uppercase tracking-wider text-slate-400">Set Price</p>
-									<p class="text-lg font-bold text-purple-600">฿{set.set_price.toLocaleString()}</p>
-									{#if set.original_price && set.original_price > set.set_price}
-										<p class="text-[10px] text-slate-400 line-through">
-											฿{set.original_price.toLocaleString()}
-										</p>
-									{/if}
-								</div>
-								<div class="text-right">
-									<p class="text-[10px] uppercase tracking-wider text-slate-400">Stock</p>
-									<p class="font-bold text-indigo-600">
-										{set.remaining_qty} / {set.total_preorder_qty}
-									</p>
-								</div>
-							</div>
-
-							{#if set.original_price && set.original_price > set.set_price}
-								<div
-									class="mb-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 py-2"
-								>
-									<svg
-										class="h-4 w-4 text-green-600"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										/>
-									</svg>
-									<span class="text-sm font-bold text-green-600">
-										Save ฿{(set.original_price - set.set_price).toLocaleString()}
-									</span>
-								</div>
-							{/if}
-
-							<div class="grid grid-cols-2 gap-2">
-								<button
-									onclick={() => openModal('edit', set)}
-									class="flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-purple-600"
-								>
-									Edit
-								</button>
-								<button
-									onclick={() => deleteSet(set.id)}
-									class="flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-red-100 hover:bg-red-50 hover:text-red-600"
-								>
-									Delete
-								</button>
-							</div>
+								{set.is_active ? 'Active' : 'Inactive'}
+							</button>
 						</div>
 					</div>
-				{/each}
-			</div>
-		{/if}
-	</main>
-</div>
+
+					<div class="p-4">
+						<div class="mb-2">
+							<p class="text-xs font-medium text-purple-500">{set.set_code}</p>
+							<h3 class="line-clamp-1 text-lg font-bold text-slate-800" title={set.set_name}>
+								{set.set_name}
+							</h3>
+						</div>
+
+						<!-- Items in set -->
+						<div class="mb-3">
+							<p class="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+								Items in set ({set.items?.length || 0})
+							</p>
+							<div class="flex flex-wrap gap-1">
+								{#each (set.items || []).slice(0, 3) as item}
+									<span
+										class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+									>
+										{item.product?.product_code} x{item.quantity}
+									</span>
+								{/each}
+								{#if (set.items?.length || 0) > 3}
+									<span
+										class="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-600"
+									>
+										+{(set.items?.length || 0) - 3} more
+									</span>
+								{/if}
+							</div>
+						</div>
+
+						<p class="mb-4 line-clamp-2 min-h-[2.5em] text-sm text-slate-500">
+							{set.description || 'No description available'}
+						</p>
+
+						<div
+							class="mb-4 flex items-center justify-between rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 p-3"
+						>
+							<div>
+								<p class="text-[10px] uppercase tracking-wider text-slate-400">Set Price</p>
+								<p class="text-lg font-bold text-purple-600">฿{set.set_price.toLocaleString()}</p>
+								{#if set.original_price && set.original_price > set.set_price}
+									<p class="text-[10px] text-slate-400 line-through">
+										฿{set.original_price.toLocaleString()}
+									</p>
+								{/if}
+							</div>
+							<div class="text-right">
+								<p class="text-[10px] uppercase tracking-wider text-slate-400">Stock</p>
+								<p class="font-bold text-indigo-600">
+									{set.remaining_qty} / {set.total_preorder_qty}
+								</p>
+							</div>
+						</div>
+
+						{#if set.original_price && set.original_price > set.set_price}
+							<div class="mb-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 py-2">
+								<svg
+									class="h-4 w-4 text-green-600"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
+								</svg>
+								<span class="text-sm font-bold text-green-600">
+									Save ฿{(set.original_price - set.set_price).toLocaleString()}
+								</span>
+							</div>
+						{/if}
+
+						<div class="grid grid-cols-2 gap-2">
+							<button
+								onclick={() => openModal('edit', set)}
+								class="flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-purple-600"
+							>
+								Edit
+							</button>
+							<button
+								onclick={() => deleteSet(set.id)}
+								class="flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-red-100 hover:bg-red-50 hover:text-red-600"
+							>
+								Delete
+							</button>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
+</main>
 
 <!-- Modal -->
 {#if showModal}
