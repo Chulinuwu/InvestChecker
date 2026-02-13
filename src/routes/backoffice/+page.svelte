@@ -525,7 +525,7 @@
 					Products
 				</button>
 				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-24 sm:text-sm text-slate-500 hover:text-slate-700"
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
 					onclick={() => goto('/backoffice/sets')}
 				>
 					Sets
@@ -540,14 +540,18 @@
 					Pre-orders
 				</button>
 				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all sm:w-24 sm:text-sm text-slate-500 hover:text-slate-700"
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
+					onclick={() => goto('/backoffice/members')}
+				>
+					Members
+				</button>
+				<button
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
 					onclick={() => goto('/backoffice/settings')}
 				>
 					Settings
 				</button>
 			</div>
-
-
 
 			<button
 				onclick={() => {

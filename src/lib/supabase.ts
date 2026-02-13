@@ -211,3 +211,35 @@ export const investmentLogService = {
 		return summary;
 	}
 };
+
+export const lineUserService = {
+	// ดึงข้อมูลสมาชิกทั้งหมด
+	async getLineUsers() {
+		const { data, error } = await supabase
+			.from('line_users')
+			.select('*')
+			.order('created_at', { ascending: false });
+
+		if (error) throw error;
+		return data;
+	},
+
+	// อัปเดตสถานะการยืนยัน
+	async updateVerificationStatus(userLineId: string, status: string) {
+		const { data, error } = await supabase
+			.from('line_users')
+			.update({ verification_status: status })
+			.eq('user_line_id', userLineId)
+			.select();
+
+		if (error) throw error;
+		return data[0];
+	},
+
+	// ลบสมาชิก
+	async deleteLineUser(userLineId: string) {
+		const { error } = await supabase.from('line_users').delete().eq('user_line_id', userLineId);
+
+		if (error) throw error;
+	}
+};

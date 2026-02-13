@@ -82,10 +82,11 @@
 					.from('product_set_items')
 					.select('*, products(*)')
 					.eq('set_id', set.id);
-				set.items = items?.map((item) => ({
-					...item,
-					product: item.products
-				})) || [];
+				set.items =
+					items?.map((item) => ({
+						...item,
+						product: item.products
+					})) || [];
 			}
 		}
 		loading = false;
@@ -234,7 +235,9 @@
 			const fileExt = file.name.split('.').pop();
 			const fileName = `sets/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-			const { data, error } = await supabase.storage.from('twentytoys').upload(fileName, compressedBlob);
+			const { data, error } = await supabase.storage
+				.from('twentytoys')
+				.upload(fileName, compressedBlob);
 
 			if (error) throw error;
 
@@ -386,24 +389,30 @@
 
 			<div class="flex rounded-lg bg-slate-100 p-1">
 				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all text-slate-500 hover:text-slate-700 sm:w-24 sm:text-sm"
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
 					onclick={() => goto('/backoffice')}
 				>
 					Products
 				</button>
 				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all bg-white text-indigo-600 shadow-sm sm:w-24 sm:text-sm"
+					class="w-16 rounded-md bg-white py-1.5 text-[10px] font-medium text-indigo-600 shadow-sm transition-all sm:w-24 sm:text-sm"
 				>
 					Sets
 				</button>
 				<button
-					class="w-20 rounded-md py-1.5 text-[10px] font-medium transition-all text-slate-500 hover:text-slate-700 sm:w-28 sm:text-sm"
+					class="w-20 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-28 sm:text-sm"
 					onclick={() => goto('/backoffice?tab=preorders')}
 				>
 					Pre-orders
 				</button>
 				<button
-					class="w-16 rounded-md py-1.5 text-[10px] font-medium transition-all text-slate-500 hover:text-slate-700 sm:w-24 sm:text-sm"
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
+					onclick={() => goto('/backoffice/members')}
+				>
+					Members
+				</button>
+				<button
+					class="w-16 rounded-md py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:text-slate-700 sm:w-24 sm:text-sm"
 					onclick={() => goto('/backoffice/settings')}
 				>
 					Settings
@@ -463,13 +472,25 @@
 
 		{#if loading}
 			<div class="flex justify-center py-20">
-				<div class="h-10 w-10 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600"></div>
+				<div
+					class="h-10 w-10 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600"
+				></div>
 			</div>
 		{:else if filteredSets.length === 0}
 			<div class="flex flex-col items-center justify-center py-20 text-center">
 				<div class="mb-4 rounded-full bg-purple-100 p-4">
-					<svg class="h-12 w-12 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+					<svg
+						class="h-12 w-12 text-purple-500"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+						/>
 					</svg>
 				</div>
 				<h3 class="mb-2 text-lg font-bold text-slate-700">No Product Sets Yet</h3>
@@ -484,12 +505,16 @@
 					>
 						<!-- Badge -->
 						<div class="absolute left-3 top-3 z-10">
-							<span class="rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg">
+							<span
+								class="rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg"
+							>
 								Set
 							</span>
 						</div>
 
-						<div class="aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50">
+						<div
+							class="aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50"
+						>
 							{#if set.image_url}
 								<img
 									src={set.image_url}
@@ -497,9 +522,16 @@
 									class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
 								/>
 							{:else}
-								<div class="flex h-full w-full flex-col items-center justify-center text-purple-300">
+								<div
+									class="flex h-full w-full flex-col items-center justify-center text-purple-300"
+								>
 									<svg class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="1.5"
+											d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+										/>
 									</svg>
 									<span class="mt-2 text-sm font-medium">{set.items?.length || 0} items</span>
 								</div>
@@ -534,12 +566,16 @@
 								</p>
 								<div class="flex flex-wrap gap-1">
 									{#each (set.items || []).slice(0, 3) as item}
-										<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+										<span
+											class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+										>
 											{item.product?.product_code} x{item.quantity}
 										</span>
 									{/each}
 									{#if (set.items?.length || 0) > 3}
-										<span class="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-600">
+										<span
+											class="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-600"
+										>
 											+{(set.items?.length || 0) - 3} more
 										</span>
 									{/if}
@@ -550,7 +586,9 @@
 								{set.description || 'No description available'}
 							</p>
 
-							<div class="mb-4 flex items-center justify-between rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 p-3">
+							<div
+								class="mb-4 flex items-center justify-between rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 p-3"
+							>
 								<div>
 									<p class="text-[10px] uppercase tracking-wider text-slate-400">Set Price</p>
 									<p class="text-lg font-bold text-purple-600">฿{set.set_price.toLocaleString()}</p>
@@ -569,9 +607,21 @@
 							</div>
 
 							{#if set.original_price && set.original_price > set.set_price}
-								<div class="mb-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 py-2">
-									<svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								<div
+									class="mb-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 py-2"
+								>
+									<svg
+										class="h-4 w-4 text-green-600"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
 									</svg>
 									<span class="text-sm font-bold text-green-600">
 										Save ฿{(set.original_price - set.set_price).toLocaleString()}
@@ -615,8 +665,13 @@
 			aria-label="Close modal overlay"
 			transition:fade
 		></button>
-		<div class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl" transition:slide>
-			<div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
+		<div
+			class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+			transition:slide
+		>
+			<div
+				class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4"
+			>
 				<h2 class="text-lg font-bold text-slate-800">
 					{modalMode === 'add' ? 'Create New Set' : 'Edit Set'}
 				</h2>
@@ -641,7 +696,9 @@
 					<!-- Basic Info -->
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="set_code" class="mb-1 block text-sm font-medium text-slate-700">Set Code</label>
+							<label for="set_code" class="mb-1 block text-sm font-medium text-slate-700"
+								>Set Code</label
+							>
 							<input
 								id="set_code"
 								type="text"
@@ -651,7 +708,9 @@
 							/>
 						</div>
 						<div>
-							<label for="set_price" class="mb-1 block text-sm font-medium text-slate-700">Set Price (฿)</label>
+							<label for="set_price" class="mb-1 block text-sm font-medium text-slate-700"
+								>Set Price (฿)</label
+							>
 							<input
 								id="set_price"
 								type="number"
@@ -662,7 +721,9 @@
 					</div>
 
 					<div>
-						<label for="set_name" class="mb-1 block text-sm font-medium text-slate-700">Set Name</label>
+						<label for="set_name" class="mb-1 block text-sm font-medium text-slate-700"
+							>Set Name</label
+						>
 						<input
 							id="set_name"
 							type="text"
@@ -674,7 +735,9 @@
 
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="total_qty" class="mb-1 block text-sm font-medium text-slate-700">Total Qty</label>
+							<label for="total_qty" class="mb-1 block text-sm font-medium text-slate-700"
+								>Total Qty</label
+							>
 							<input
 								id="total_qty"
 								type="number"
@@ -683,7 +746,9 @@
 							/>
 						</div>
 						<div>
-							<label for="remaining_qty" class="mb-1 block text-sm font-medium text-slate-700">Remaining</label>
+							<label for="remaining_qty" class="mb-1 block text-sm font-medium text-slate-700"
+								>Remaining</label
+							>
 							<input
 								id="remaining_qty"
 								type="number"
@@ -703,7 +768,12 @@
 								class="flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-700"
 							>
 								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 4v16m8-8H4"
+									/>
 								</svg>
 								Add Product
 							</button>
@@ -720,11 +790,14 @@
 										<select
 											class="flex-1 rounded-lg border-slate-200 text-sm focus:border-purple-500 focus:ring-purple-500"
 											value={item.product_id}
-											onchange={(e) => updateProductSelection(index, (e.target as HTMLSelectElement).value)}
+											onchange={(e) =>
+												updateProductSelection(index, (e.target as HTMLSelectElement).value)}
 										>
 											<option value="">Select a product...</option>
 											{#each products as product}
-												<option value={product.id}>{product.product_code} - {product.product_name} (฿{product.price.toLocaleString()})</option>
+												<option value={product.id}
+													>{product.product_code} - {product.product_name} (฿{product.price.toLocaleString()})</option
+												>
 											{/each}
 										</select>
 										<div class="flex items-center gap-1">
@@ -734,7 +807,11 @@
 												min="1"
 												class="w-16 rounded-lg border-slate-200 text-center text-sm focus:border-purple-500 focus:ring-purple-500"
 												value={item.quantity}
-												onchange={(e) => updateProductQuantity(index, parseInt((e.target as HTMLInputElement).value) || 1)}
+												onchange={(e) =>
+													updateProductQuantity(
+														index,
+														parseInt((e.target as HTMLInputElement).value) || 1
+													)}
 											/>
 										</div>
 										<button
@@ -743,7 +820,12 @@
 											class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
 										>
 											<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+												/>
 											</svg>
 										</button>
 									</div>
@@ -752,17 +834,35 @@
 
 							<!-- Calculated Price -->
 							<div class="mt-3 flex items-center justify-between rounded-lg bg-purple-100 p-3">
-								<span class="text-sm font-medium text-purple-800">Original Price (if bought separately):</span>
-								<span class="text-lg font-bold text-purple-900">฿{calculatedOriginalPrice().toLocaleString()}</span>
+								<span class="text-sm font-medium text-purple-800"
+									>Original Price (if bought separately):</span
+								>
+								<span class="text-lg font-bold text-purple-900"
+									>฿{calculatedOriginalPrice().toLocaleString()}</span
+								>
 							</div>
 
 							{#if formData.set_price > 0 && calculatedOriginalPrice() > formData.set_price}
-								<div class="mt-2 flex items-center justify-center gap-2 rounded-lg bg-green-100 p-2">
-									<svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+								<div
+									class="mt-2 flex items-center justify-center gap-2 rounded-lg bg-green-100 p-2"
+								>
+									<svg
+										class="h-4 w-4 text-green-600"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
 									</svg>
 									<span class="text-sm font-bold text-green-700">
-										Customer saves ฿{(calculatedOriginalPrice() - formData.set_price).toLocaleString()}!
+										Customer saves ฿{(
+											calculatedOriginalPrice() - formData.set_price
+										).toLocaleString()}!
 									</span>
 								</div>
 							{/if}
@@ -771,7 +871,9 @@
 
 					<!-- Image Upload -->
 					<div>
-						<label for="image_file" class="mb-1 block text-sm font-medium text-slate-700">Set Image</label>
+						<label for="image_file" class="mb-1 block text-sm font-medium text-slate-700"
+							>Set Image</label
+						>
 						<div class="flex items-center gap-4">
 							<div class="relative flex-1">
 								<input
@@ -807,7 +909,9 @@
 								</div>
 							</div>
 							{#if formData.image_url && !selectedFile}
-								<div class="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+								<div
+									class="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200"
+								>
 									<img src={formData.image_url} alt="Preview" class="h-full w-full object-cover" />
 								</div>
 							{/if}
@@ -837,7 +941,9 @@
 
 					<!-- Description -->
 					<div>
-						<label for="description" class="mb-1 block text-sm font-medium text-slate-700">Description</label>
+						<label for="description" class="mb-1 block text-sm font-medium text-slate-700"
+							>Description</label
+						>
 						<textarea
 							id="description"
 							rows="3"
@@ -855,8 +961,19 @@
 				>
 					{#if uploading}
 						<svg class="h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
 						</svg>
 						Saving...
 					{:else}
