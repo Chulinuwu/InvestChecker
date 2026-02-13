@@ -34,6 +34,18 @@
 			members = members.map((m) =>
 				m.user_line_id === userLineId ? { ...m, verification_status: status } : m
 			);
+
+			// ส่งข้อความแจ้งเตือนผ่านบอท
+			try {
+				const backendUrl = import.meta.env.VITE_BACKEND_URL;
+				await fetch(`${backendUrl}/api/notify-verification`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ userLineId, status })
+				});
+			} catch (notifyError) {
+				console.error('Failed to send notification:', notifyError);
+			}
 		} catch (error) {
 			console.error('Error updating status:', error);
 			alert('Failed to update status');
