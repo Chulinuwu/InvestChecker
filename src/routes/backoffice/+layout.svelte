@@ -99,6 +99,16 @@
 					>
 						Settings
 					</button>
+					<button
+						class="flex-1 rounded-lg px-4 py-1.5 text-sm font-bold transition-all {isActive(
+							'/backoffice/gifts'
+						)
+							? 'bg-white text-indigo-600 shadow-sm'
+							: 'text-slate-500 hover:text-slate-700'}"
+						onclick={() => goto('/backoffice/gifts')}
+					>
+						Gifts
+					</button>
 				</div>
 			</div>
 
@@ -189,6 +199,24 @@
 					/>
 				</svg>
 				<span class="text-[10px] font-bold">Members</span>
+			</button>
+			<button
+				onclick={() => goto('/backoffice/gifts')}
+				class="flex flex-col items-center gap-1 rounded-xl p-2 px-3 transition-all {isActive(
+					'/backoffice/gifts'
+				)
+					? 'bg-indigo-50 text-indigo-600'
+					: 'text-slate-400'}"
+			>
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+					/>
+				</svg>
+				<span class="text-[10px] font-bold">Gifts</span>
 			</button>
 			<button
 				onclick={() => goto('/backoffice/settings')}
