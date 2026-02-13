@@ -103,6 +103,10 @@
 
 	async function sendBroadcast() {
 		if (!broadcastMessage.trim()) return;
+		if (broadcastMessage.length > 500) {
+			alert('ข้อความต้องไม่เกิน 500 ตัวอักษร');
+			return;
+		}
 		if (!confirm('ยืนยันการส่งข้อความหาลูกค้าทุกคน? การดำเนินการนี้ไม่สามารถยกเลิกได้')) return;
 
 		broadcasting = true;
@@ -394,8 +398,18 @@
 						}}
 						placeholder="พิมพ์ข้อความที่ต้องการแจ้งลูกค้าทุกคนที่นี่... (น้องทเวนตี้จะส่งหาทุกคนทันทีนะค๊าา)"
 						rows="4"
-						class="w-full resize-none overflow-hidden rounded-2xl border-slate-200 bg-slate-50/50 p-4 text-sm transition-all focus:border-amber-500 focus:bg-white focus:ring-amber-500"
+						class="w-full resize-none overflow-hidden rounded-2xl border-slate-200 bg-slate-50/50 p-4 text-sm transition-all focus:border-amber-500 focus:bg-white focus:ring-amber-500 {broadcastMessage.length >
+						500
+							? 'border-rose-300 bg-rose-50 focus:border-rose-500 focus:ring-rose-500'
+							: ''}"
 					></textarea>
+					<div
+						class="absolute bottom-4 right-4 text-xs font-medium {broadcastMessage.length > 500
+							? 'text-rose-600'
+							: 'text-slate-400'}"
+					>
+						{broadcastMessage.length}/500
+					</div>
 				</div>
 
 				<div class="flex items-center justify-between">
