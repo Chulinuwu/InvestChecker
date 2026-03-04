@@ -51,6 +51,12 @@
 	let preorderLogs: PreorderLog[] = $state([]);
 	let loading = $state(true);
 	let searchTerm = $state('');
+
+	// Pagination State
+	let preorderPage = $state(1);
+	let preorderPageSize = 50;
+	let totalPreorderLogs = $state(0);
+	let totalPreorderPages = $derived(Math.ceil(totalPreorderLogs / preorderPageSize));
 	let openDropdownId = $state<string | null>(null);
 	let selectedItems = $state<Set<string>>(new Set());
 
@@ -102,13 +108,20 @@
 
 	async function fetchPreorders() {
 		loading = true;
-		const { data, error } = await supabase
+		const from = (preorderPage - 1) * preorderPageSize;
+		const to = from + preorderPageSize - 1;
+
+		const { data, error, count } = await supabase
 			.from('preorder_logs')
-			.select('*')
-			.order('created_at', { ascending: false });
+			.select('*', { count: 'exact' })
+			.order('created_at', { ascending: false })
+			.range(from, to);
 
 		if (error) console.error('Error fetching preorders:', error);
-		else preorderLogs = data || [];
+		else {
+			preorderLogs = data || [];
+			if (count !== null) totalPreorderLogs = count;
+		}
 		loading = false;
 	}
 
@@ -458,6 +471,15 @@
 	$effect(() => {
 		if (activeTab === 'products') fetchProducts();
 		else fetchPreorders();
+	});
+
+	// Refetch preorders when page changes
+	$effect(() => {
+		if (activeTab === 'preorders') {
+			// Accessing preorderPage here makes this effect run whenever it changes
+			const _ = preorderPage;
+			fetchPreorders();
+		}
 	});
 
 	// Derived
@@ -965,6 +987,75 @@
 					</div>
 				{/each}
 			</div>
+
+			<!-- Pagination Controls -->
+			{#if totalPreorderPages > 1}
+				<div class="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+					<div class="text-sm text-slate-500">
+						Showing <span class="font-medium text-slate-900"
+							>{(preorderPage - 1) * preorderPageSize + 1}</span
+						>
+						to
+						<span class="font-medium text-slate-900"
+							>{Math.min(preorderPage * preorderPageSize, totalPreorderLogs)}</span
+						>
+						of
+						<span class="font-medium text-slate-900">{totalPreorderLogs}</span> results
+					</div>
+					<div class="flex items-center gap-2">
+						<button
+							onclick={() => (preorderPage = Math.max(1, preorderPage - 1))}
+							disabled={preorderPage === 1}
+							class="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white"
+						>
+							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M15 19l-7-7 7-7"
+								/>
+							</svg>
+						</button>
+
+						<div class="flex items-center gap-1">
+							{#each Array.from({ length: Math.min(5, totalPreorderPages) }, (_, i) => {
+								let p;
+								if (totalPreorderPages <= 5) p = i + 1;
+								else if (preorderPage <= 3) p = i + 1;
+								else if (preorderPage >= totalPreorderPages - 2) p = totalPreorderPages - 4 + i;
+								else p = preorderPage - 2 + i;
+								return p;
+							}) as p}
+								<button
+									onclick={() => (preorderPage = p)}
+									class="flex h-10 w-10 items-center justify-center rounded-xl font-bold transition-all
+										{preorderPage === p
+										? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+										: 'bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 hover:text-indigo-600'}"
+								>
+									{p}
+								</button>
+							{/each}
+						</div>
+
+						<button
+							onclick={() => (preorderPage = Math.min(totalPreorderPages, preorderPage + 1))}
+							disabled={preorderPage === totalPreorderPages}
+							class="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white"
+						>
+							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M9 5l7 7-7 7"
+								/>
+							</svg>
+						</button>
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </main>
